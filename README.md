@@ -102,11 +102,37 @@ python cli.py doctor --require cuda tensorrt     # checks the available ORT prov
 
 ## Get weights and data
 
-Download **CBRS-CEDAR-RT-ASSETS**, this project's independent data/model package.
-It contains only `datasets/`, `weights/`, `splits.csv` and a README. The cloud-drive
-URL will be added after upload. It includes every experiment PNG and label at
-**640 × 640**, the fixed train/val/test split and all 12 RT checkpoints.
-From this repository root:
+**[Download CBRS-CEDAR-RT-ASSETS v1.0 from GitHub Releases](https://github.com/UIC-Networking-Research-Lab/CBRS-CEDAR-RT/releases/tag/assets)**
+
+1. Open the release's **Assets** list and download **all 3 archive parts**:
+   `CBRS-CEDAR-RT-ASSETS.7z.001` through `CBRS-CEDAR-RT-ASSETS.7z.003`.
+   Keep all parts in the same folder with their original names.
+2. Use **7-Zip** to extract `CBRS-CEDAR-RT-ASSETS.7z.001` only. It reads the remaining
+   parts automatically; do not extract each part separately.
+3. Place the extracted `CBRS-CEDAR-RT-ASSETS` folder beside the repository:
+
+```text
+workspace/
+  CBRS-CEDAR-RT/
+  CBRS-CEDAR-RT-ASSETS/
+    datasets/
+    weights/
+    splits.csv
+    README.md
+```
+
+Alternatively, extract from the folder containing all parts with:
+
+```bash
+7z x CBRS-CEDAR-RT-ASSETS.7z.001
+```
+
+GitHub's **Source code (zip/tar.gz)** downloads contain code, not the datasets or
+weights. Use this project's asset package; the MDI and RT packages are independent.
+
+The package includes every experiment PNG and label at **640 × 640**, the fixed
+train/val/test split and all 12 RT checkpoints. After installing the dependencies
+listed above, run from the repository root:
 
 ```bash
 python reproduce.py --assets ../CBRS-CEDAR-RT-ASSETS --task install
