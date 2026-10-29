@@ -8,6 +8,13 @@ size affect inference speed and detection quality. It extends
 [CBRS-CEDAR-MDI](https://github.com/UIC-Networking-Research-Lab/CBRS-CEDAR-MDI)
 with a PC GPU deployment and benchmarking pipeline.
 
+**These experiments were run on the author's personal PC, without a rigorously
+controlled benchmarking environment. The reported results are for reference only.**
+We encourage you to download the [source code](https://github.com/UIC-Networking-Research-Lab/CBRS-CEDAR-RT)
+and [datasets and pretrained models](https://github.com/UIC-Networking-Research-Lab/CBRS-CEDAR-RT/releases/tag/assets),
+set up a controlled experimental environment, and repeat the measurements on your
+own hardware. See [Get weights and data](#get-weights-and-data) for setup instructions.
+
 The pipeline supports FP32/FP16 export, INT8 calibration with training images,
 ONNX Runtime execution, and direct TensorRT engine building. The evaluation
 compares nine original YOLO models (YOLOv8/YOLO11/YOLO26, n/s/x) and three
