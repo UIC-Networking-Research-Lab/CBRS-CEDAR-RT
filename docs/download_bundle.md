@@ -75,7 +75,16 @@ The installer places data in `data/yolo_split/` and weights in `artifacts/weight
 Use the supplied PNGs directly; GPU inference and calibration need no raw I/Q.
 The [Genesys Lab dataset page](https://genesys-lab.org/CBRS) provides the original
 over-the-air radar/LTE recordings. Follow its terms and cite the dataset paper.
-Raw recordings are not redistributed here.
+Raw recordings are not redistributed here and are unnecessary for the RT benchmarks.
+
+**The original Genesys frames do not include our train/validation/test partitions.**
+If you download raw recordings to regenerate PNGs, use the assets' `splits.csv`
+(or the repository's [`splits/cbrs_split.csv`](../splits/cbrs_split.csv)) to restore
+the exact split membership. Follow the
+[MDI raw-data preparation guide](https://github.com/UIC-Networking-Research-Lab/CBRS-CEDAR-MDI/blob/main/docs/data.md#5-build-the-raw-sigmf-split),
+and preserve that membership through conversion. Use training images for calibration
+and validation images for reproducing the RT evaluation. The PNGs in this download
+already follow these splits.
 
 **Preprocessing parameters and library versions change the spectrogram pixels.
 Even a small mismatch can invalidate predictions from pretrained weights.** Use the

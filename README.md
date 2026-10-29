@@ -168,8 +168,19 @@ and checkpoint contents.
 
 **Use the supplied PNGs directly.** GPU inference and calibration require no raw I/Q
 recordings. For raw data, follow the parent project's data guide and the
-[original Genesys Lab dataset page](https://genesys-lab.org/CBRS). That dataset is not
-redistributed in the bundle.
+[Genesys Lab over-the-air CBRS dataset](https://genesys-lab.org/CBRS). Raw recordings
+are needed only if you want raw-frame inputs or to regenerate spectrograms; they
+are not redistributed in the bundle.
+
+**The original recordings do not come with our train/validation/test partitions.**
+When using them, apply our [fixed split list](splits/cbrs_split.csv), also provided
+as `splits.csv` in the RT assets, before training, calibration or evaluation.
+Follow the parent repository's
+[raw-data split restoration steps](https://github.com/UIC-Networking-Research-Lab/CBRS-CEDAR-MDI/blob/main/docs/data.md#5-build-the-raw-sigmf-split).
+Keep the same membership when converting recordings to PNGs. The supplied RT
+PNGs are already split: calibration uses training images, and the reported RT
+quality measurements use validation images. Do not create a new random split
+when reproducing these results.
 
 **Both library versions and preprocessing parameters affect the spectrogram pixels.**
 Even a small mismatch can invalidate predictions from pretrained weights, despite
