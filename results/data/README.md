@@ -12,7 +12,7 @@ This is the single data location used by `python analyze_results.py`. Files are 
 | `history.jsonl` | Earlier recorded attempts, including failures and available partial measurements; these are not extra repetitions of the final evaluation. |
 | `manifest.json` | SHA-256 checksums, source audit and analysis-code hashes. |
 
-`inference_time_per_frame_s = 1 / mean(images_per_second)` across the three timing rounds. `macro_f1` is the arithmetic mean of LTE and radar box-detection F1. Quality is evaluated once per route and repeated alongside each timing scope.
+`inference_time_per_frame_s = 1 / mean(images_per_second)` across the three timing rounds. `macro_f1` is the arithmetic mean of LTE and radar box-detection F1. Quality is evaluated once per configuration and repeated alongside each timing scope.
 
 The final scope is 12 models, batches 1/4/8 and eight GPU policies. CPU testing is canceled. The original plan also included batches 16/32; those unrun entries remain provenance and are excluded from report completion counts.
 

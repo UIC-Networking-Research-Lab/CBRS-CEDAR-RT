@@ -23,7 +23,7 @@ def wheel_distribution(path: Path) -> str:
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--ort-wheel", type=Path, help="GPU wheel matched to Jetson Python/CUDA/cuDNN/TensorRT")
-    parser.add_argument("--ort-cpu-only", action="store_true", help="Install CPU-only ORT for route D")
+    parser.add_argument("--ort-cpu-only", action="store_true", help="Install CPU-only ONNX Runtime")
     args = parser.parse_args()
     if args.ort_wheel and args.ort_cpu_only:
         parser.error("Choose one ORT distribution")

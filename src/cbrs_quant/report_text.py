@@ -39,11 +39,11 @@ def overview_sections(rows, overview_files, output, timing_scope):
     f1_deltas = [abs(float(b['macro_f1']) - float(a['macro_f1'])) for a, b in fp16
                  if a.get('macro_f1') is not None and b.get('macro_f1') is not None]
     if f1_deltas:
-        quality.append(f"The TensorRT FP16 routes track each model's PyTorch FP32 quality: "
+        quality.append(f"The TensorRT FP16 configurations track each model's PyTorch FP32 quality: "
                        f"the largest absolute detection-F1 change is **{max(f1_deltas):.5f}**.")
     if fp16:
         delta = max(abs(float(b['map50']) - float(a['map50'])) for a, b in fp16)
-        maps.append(f"Across the TensorRT FP16 routes, the largest absolute mAP@0.5 change "
+        maps.append(f"Across the TensorRT FP16 configurations, the largest absolute mAP@0.5 change "
                     f"from PyTorch FP32 is **{delta:.5f}**.")
     int8 = pairs('trt_int8')
     if int8:
@@ -59,7 +59,7 @@ def overview_sections(rows, overview_files, output, timing_scope):
     definitions = [
         ('inference_time_per_frame_s', 'Inference speed',
          'Inference time per frame is the inverse of mean throughput across the timing rounds; lower is better. '
-         'Each panel uses its own time scale. CUDA labels denote ONNX Runtime CUDA; TRT denotes direct TensorRT.', speed),
+         'Each panel uses its own time scale. Figure labels: Torch = PyTorch; CUDA = ONNX Runtime CUDA; ORT TRT = ONNX Runtime TensorRT; TRT = direct TensorRT.', speed),
         ('macro_f1', 'Detection F1',
          'Rows are deployment policies and columns are models. Values average LTE and radar box-detection F1 '
          'at confidence 0.25 and box IoU 0.5; higher is better.', quality),
@@ -80,7 +80,7 @@ def write_reports(bundle, rows, routes, charts, overview_files, output):
     scope = bundle["report_scope"]
     completed = sum(r["status"] == "passed" for r in selected_routes)
     devices = "GPU" if all(m not in CPU_MODES for m in scope["modes"]) else "GPU/CPU"
-    completion = f"**{completed}/{len(selected_routes)} {devices} routes completed: {len(scope['models'])} models, batches {', '.join(map(str,scope['batches']))}, {len(scope['modes'])} deployment policies.**"
+    completion = f"**{completed}/{len(selected_routes)} {devices} configurations completed: {len(scope['models'])} models, batches {', '.join(map(str,scope['batches']))}, {len(scope['modes'])} deployment policies.**"
     first = bundle["models"][bundle["order"][0]]["meta"]
     environments = [env for item in bundle["models"].values() for env in item["meta"].get("environments", {}).values()]
     env = environments[0] if environments else {}
@@ -91,6 +91,7 @@ def write_reports(bundle, rows, routes, charts, overview_files, output):
     parts = ["# CBRS-CEDAR-RT: complete GPU experiment report", "", completion, "",
         f"Recorded experiment: `{bundle['run_name']}`. All final measurements and earlier recorded attempts are stored together in [data/](data/README.md).", "",
         "## Setup", "",
+        'The four GPU backends are **PyTorch (`Torch`)**, **ONNX Runtime CUDA (`CUDA`)**, **ONNX Runtime TensorRT (`ORT TRT`)**, and **direct TensorRT (`TRT`)**. PyTorch and ONNX Runtime CUDA use FP32/FP16; both TensorRT backends use FP16/INT8. These form eight backend/precision settings. One experimental configuration is one model, batch size, and backend/precision setting. **No CPU measurements are included.**', "",
         "**All experiments in this report run on the PC GPU**, in Conda `torch270_py312_cuda`; no Jetson deployment tests are reported. The `trained_models_mdi/` name identifies the CEDAR checkpoint edition, not the execution platform.", "",
         "The [README environment table](../README.md#installation) lists tested/recommended versions. Compatible general runtime libraries can be used. For raw-I/Q conversion, preserve preprocessing library versions and parameters: even small pixel changes can invalidate pretrained predictions. The recorded RT experiments use the supplied PNGs directly.", "",
         f"- Device: **{env.get('gpu','see metadata')}**, {env.get('platform','see metadata')}.",
@@ -116,14 +117,14 @@ def write_reports(bundle, rows, routes, charts, overview_files, output):
     overview_scope = overview_files[0][0].stem.split("_b")[0].removeprefix("overview_") if overview_files else "model_compute"
     overview = overview_sections(rows, overview_files, output, overview_scope)
     parts.extend(overview)
-    parts.extend(["## Completion and data audit", "", "| Batch | Completed GPU routes | Remaining |", "|---:|---:|---:|"])
+    parts.extend(["## Completion and data audit", "", "| Batch | Completed GPU configurations | Remaining |", "|---:|---:|---:|"])
     for batch in scope["batches"]:
         group = [r for r in selected_routes if int(r["batch"]) == batch]
         n = sum(r["status"] == "passed" for r in group)
         parts.append(f"| {batch} | {n}/{len(group)} | {len(group)-n} |")
     parts.extend(["", f"The final tables contain **{len(rows)} model × batch × policy × timing-scope aggregates**. Each aggregate is checked against its original rounds and protocol signatures.", "",
         f"Earlier attempts are retained in `data/history.jsonl` ({audit.get('history_attempts','see manifest')} distinct archived attempts). They are excluded from the final averages. The original full experiment plan and canceled entries remain traceable in `data/routes.csv` and `data/metadata.json`.", "",
-        "## All model results", "", "| Model | Final routes | Detailed results |", "|---|---:|---|"])
+        "## All model results", "", "| Model | Final configurations | Detailed results |", "|---|---:|---|"])
     for model in scope["models"]:
         group = [r for r in selected_routes if r["model"] == model]
         parts.append(f"| {model_label(model)} | {sum(r['status']=='passed' for r in group)}/{len(group)} | [Tables and figures](#{model}) |")
@@ -177,7 +178,7 @@ This is the single data location used by `python analyze_results.py`. Files are 
 | `history.jsonl` | Earlier recorded attempts, including failures and available partial measurements; these are not extra repetitions of the final evaluation. |
 | `manifest.json` | SHA-256 checksums, source audit and analysis-code hashes. |
 
-`inference_time_per_frame_s = 1 / mean(images_per_second)` across the three timing rounds. `macro_f1` is the arithmetic mean of LTE and radar box-detection F1. Quality is evaluated once per route and repeated alongside each timing scope.
+`inference_time_per_frame_s = 1 / mean(images_per_second)` across the three timing rounds. `macro_f1` is the arithmetic mean of LTE and radar box-detection F1. Quality is evaluated once per configuration and repeated alongside each timing scope.
 
 The final scope is 12 models, batches 1/4/8 and eight GPU policies. CPU testing is canceled. The original plan also included batches 16/32; those unrun entries remain provenance and are excluded from report completion counts.
 

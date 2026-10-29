@@ -1,8 +1,10 @@
 # CBRS-CEDAR-RT: complete GPU experiment report
 
-**288/288 GPU routes completed: 12 models, batches 1, 4, 8, 8 deployment policies.**
+**288/288 GPU configurations completed: 12 models, batches 1, 4, 8, 8 deployment policies.**
 
 Recorded experiment: `run-20261024-151307-737246`. All final measurements and earlier recorded attempts are stored together in [data/](data/README.md).
+
+The four GPU backends are **PyTorch (`Torch`)**, **ONNX Runtime CUDA (`CUDA`)**, **ONNX Runtime TensorRT (`ORT TRT`)**, and **direct TensorRT (`TRT`)**. PyTorch and ONNX Runtime CUDA use FP32/FP16; both TensorRT backends use FP16/INT8. These form eight backend/precision settings. One experimental configuration is one model, batch size, and backend/precision setting. **No CPU measurements are included.**
 
 ## Setup
 
@@ -43,7 +45,7 @@ The three figures below compare inference speed, detection F1 and mAP@0.5 at bat
 
 ![Inference speed across deployment policies](figures/overview_model_compute_b001_inference_time_per_frame_s.png)
 
-Inference time per frame is the inverse of mean throughput across the timing rounds; lower is better. Each panel uses its own time scale. CUDA labels denote ONNX Runtime CUDA; TRT denotes direct TensorRT.
+Inference time per frame is the inverse of mean throughput across the timing rounds; lower is better. Each panel uses its own time scale. Figure labels: Torch = PyTorch; CUDA = ONNX Runtime CUDA; ORT TRT = ONNX Runtime TensorRT; TRT = direct TensorRT.
 
 ONNX Runtime with TensorRT FP16 achieves **2.94–6.94× the PyTorch FP32 throughput** across 12 models in this timing scope. Direct TensorRT FP16 achieves **3.22–7.94× the PyTorch FP32 throughput** across 12 models in this timing scope. For YOLOv8x, ORT CUDA FP16 takes 0.1191 s/frame, compared with 0.0412 s/frame for PyTorch FP32.
 
@@ -53,7 +55,7 @@ ONNX Runtime with TensorRT FP16 achieves **2.94–6.94× the PyTorch FP32 throug
 
 Rows are deployment policies and columns are models. Values average LTE and radar box-detection F1 at confidence 0.25 and box IoU 0.5; higher is better.
 
-The TensorRT FP16 routes track each model's PyTorch FP32 quality: the largest absolute detection-F1 change is **0.00085**. INT8 has a larger, model-dependent effect. For YOLO26x, direct TensorRT INT8 changes F1 from **0.9774 to 0.6581**.
+The TensorRT FP16 configurations track each model's PyTorch FP32 quality: the largest absolute detection-F1 change is **0.00085**. INT8 has a larger, model-dependent effect. For YOLO26x, direct TensorRT INT8 changes F1 from **0.9774 to 0.6581**.
 
 ### mAP@0.5
 
@@ -61,11 +63,11 @@ The TensorRT FP16 routes track each model's PyTorch FP32 quality: the largest ab
 
 The matrix reports mean average precision for LTE and radar boxes at IoU 0.5; higher is better.
 
-Across the TensorRT FP16 routes, the largest absolute mAP@0.5 change from PyTorch FP32 is **0.00008**. The largest mAP@0.5 reduction under direct TensorRT INT8 occurs on YOLO26x: **0.9936 → 0.7624**. INT8 deployment therefore requires validation for each model and batch configuration.
+Across the TensorRT FP16 configurations, the largest absolute mAP@0.5 change from PyTorch FP32 is **0.00008**. The largest mAP@0.5 reduction under direct TensorRT INT8 occurs on YOLO26x: **0.9936 → 0.7624**. INT8 deployment therefore requires validation for each model and batch configuration.
 
 ## Completion and data audit
 
-| Batch | Completed GPU routes | Remaining |
+| Batch | Completed GPU configurations | Remaining |
 |---:|---:|---:|
 | 1 | 96/96 | 0 |
 | 4 | 96/96 | 0 |
@@ -77,7 +79,7 @@ Earlier attempts are retained in `data/history.jsonl` (25 distinct archived atte
 
 ## All model results
 
-| Model | Final routes | Detailed results |
+| Model | Final configurations | Detailed results |
 |---|---:|---|
 | YOLOv8n | 24/24 | [Tables and figures](#cbrs_yolo8n) |
 | YOLOv8s | 24/24 | [Tables and figures](#cbrs_yolo8s) |
