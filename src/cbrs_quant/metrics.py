@@ -1,0 +1,106 @@
+"""Confidence-greedy matching and 101-point interpolated detection AP.
+
+This is a fixed two-class protocol, not the complete COCO area/crowd evaluator.
+"""
+
+from __future__ import annotations
+
+import numpy as np
+
+IOU_THRESHOLDS = np.linspace(0.5, 0.95, 10)
+
+
+def box_iou(boxes: np.ndarray, targets: np.ndarray) -> np.ndarray:
+    intersect = np.maximum(0, np.minimum(boxes[:, None, 2:], targets[None, :, 2:])
+                           - np.maximum(boxes[:, None, :2], targets[None, :, :2])).prod(2)
+    areas = np.maximum(0, boxes[:, 2:] - boxes[:, :2]).prod(1)
+    target_areas = np.maximum(0, targets[:, 2:] - targets[:, :2]).prod(1)
+    return intersect / np.maximum(areas[:, None] + target_areas[None, :] - intersect, 1e-12)
+
+
+def match(pred: np.ndarray, target: np.ndarray, thresholds=IOU_THRESHOLDS) -> np.ndarray:
+    """Each target can match only once at each IoU threshold, in score order."""
+    correct = np.zeros((len(pred), len(thresholds)), dtype=bool)
+    if len(pred) == 0 or len(target) == 0:
+        return correct
+    overlaps = box_iou(pred[:, :4], target[:, 1:])
+    for column, threshold in enumerate(thresholds):
+        used = set()
+        for index in np.argsort(-pred[:, 4], kind="stable"):
+            candidates = np.flatnonzero((target[:, 0] == pred[index, 5])
+                                       & (overlaps[index] >= threshold))
+            candidates = sorted(candidates, key=lambda j: -overlaps[index, j])
+            chosen = next((int(j) for j in candidates if j not in used), None)
+            if chosen is not None:
+                used.add(chosen)
+                correct[index, column] = True
+    return correct
+
+
+def average_precision(correct: np.ndarray, scores: np.ndarray, count: int) -> float | None:
+    if count == 0:
+        return None
+    if not len(scores):
+        return 0.0
+    tp = correct[np.argsort(-scores, kind="stable")].cumsum()
+    recall = tp / count
+    precision = tp / np.arange(1, len(tp)+1)
+    envelope = np.maximum.accumulate(precision[::-1])[::-1]
+    values = [float(envelope[recall >= r].max()) if np.any(recall >= r) else 0.0
+              for r in np.linspace(0, 1, 101)]
+    return float(np.mean(values))
+
+
+def summarize(pairs: list[tuple[np.ndarray, np.ndarray]], operating_conf: float = 0.25) -> dict:
+    if not .001 <= operating_conf <= 1:
+        raise ValueError("Operating confidence must be in [.001, 1]")
+    if not pairs:
+        raise ValueError("No evaluated images")
+    per_class = {}
+    for cls, name in enumerate(("LTE", "Radar")):
+        rows, counts, operating_tp, operating_fp = [], 0, 0, 0
+        frequency_ious = []
+        for prediction, target in pairs:
+            pred = prediction[prediction[:, 5] == cls]
+            truth = target[target[:, 0] == cls]
+            correct = match(pred, truth)
+            rows.extend(zip(pred[:, 4], correct))
+            counts += len(truth)
+            selected = pred[:, 4] >= operating_conf
+            operating_tp += int(correct[selected, 0].sum())
+            operating_fp += int(selected.sum() - correct[selected, 0].sum())
+            # Auxiliary x-axis IoU for matched operating-point true positives only.
+            if len(truth):
+                overlaps = box_iou(pred[:, :4], truth[:, 1:])
+                used = set()
+                for i in np.argsort(-pred[:, 4], kind="stable"):
+                    if not selected[i] or not correct[i, 0]:
+                        continue
+                    candidates = sorted((j for j in range(len(truth)) if j not in used
+                                         and overlaps[i, j] >= .5), key=lambda j: -overlaps[i, j])
+                    if not candidates:
+                        continue
+                    j = candidates[0]
+                    used.add(j)
+                    left, right = max(pred[i, 0], truth[j, 1]), min(pred[i, 2], truth[j, 3])
+                    union = (pred[i, 2]-pred[i, 0]) + (truth[j, 3]-truth[j, 1]) - max(0, right-left)
+                    frequency_ious.append(float(max(0, right-left) / max(union, 1e-12)))
+        scores = np.asarray([r[0] for r in rows])
+        correct = np.asarray([r[1] for r in rows], dtype=bool).reshape(-1, 10)
+        ap = [average_precision(correct[:, i], scores, counts) for i in range(10)]
+        precision = operating_tp / max(1, operating_tp+operating_fp)
+        recall = operating_tp/counts if counts else None
+        per_class[name] = {"targets": counts, "ap50": ap[0],
+                           "ap50_95": float(np.mean(ap)) if counts else None,
+                           "precision": precision, "recall": recall,
+                           "f1": 2*precision*recall/max(precision+recall, 1e-12) if counts else None,
+                           "true_positives": operating_tp, "false_positives": operating_fp,
+                           "false_positives_per_image": operating_fp/len(pairs),
+                           "matched_frequency_iou": float(np.mean(frequency_ious))
+                           if frequency_ious else None}
+    valid = [v for v in per_class.values() if v["targets"]]
+    return {"protocol": "confidence-greedy; 101-point AP; no area/crowd filtering",
+            "images": len(pairs), "operating_confidence": operating_conf,
+            "map50": float(np.mean([v["ap50"] for v in valid])) if valid else None,
+            "map50_95": float(np.mean([v["ap50_95"] for v in valid])) if valid else None,
+            "classes": per_class}

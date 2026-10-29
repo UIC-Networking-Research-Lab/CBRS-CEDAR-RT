@@ -1,0 +1,15 @@
+# Tested PC environment: Python 3.12, Conda torch270_py312_cuda (README.md).
+# Run from the repository root:
+#   python -m pip install -r requirements.txt
+# Install platform-matched PyTorch/torchvision, ONNX Runtime GPU and TensorRT
+# as described in README.md. RT results are PC-only.
+# General runtime dependencies allow compatible versions; rendering dependencies
+# below preserve the tested PC raw-I/Q conversion profile and require pixel checks.
+numpy==2.2.4
+Pillow==11.2.1
+PyYAML>=6
+ultralytics>=8.4.46,<9
+onnx>=1.17,<1.19
+matplotlib==3.10.8
+scipy==1.14.1
+psutil>=5.9,<8

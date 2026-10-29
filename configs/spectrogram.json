@@ -1,0 +1,17 @@
+{
+  "id": "cbrs-640-viridis-v1",
+  "image_size": [640, 640],
+  "classes": ["LTE", "Radar"],
+  "sample_rate_hz": 30720000,
+  "nperseg": 512,
+  "noverlap": 384,
+  "mode": "magnitude",
+  "db": "10*log10(magnitude+1e-10)",
+  "transpose": true,
+  "origin": "upper",
+  "cmap": "viridis",
+  "percentiles": [5, 95],
+  "dpi": 100,
+  "versions": {"numpy": "2.2.4", "Pillow": "11.2.1", "matplotlib": "3.10.8", "scipy": "1.14.1"},
+  "provenance": "Rendering versions follow the source project. SciPy 1.14.1 is the current local reproduction candidate, not a verified historical training lock. Verify pixels against supplied PNGs."
+}

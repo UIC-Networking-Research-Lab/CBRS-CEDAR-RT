@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "description": "Example only. Replace run with a newly recorded compact run before use.",
+  "run": "output/example-run",
+  "experiments": [
+    {
+      "model": "cbrs_yolo8n",
+      "batch": 1,
+      "mode": "ort_trt_fp16",
+      "reason": "example_retry"
+    }
+  ]
+}
