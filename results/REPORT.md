@@ -10,7 +10,7 @@ The four GPU backends are **PyTorch (`Torch`)**, **ONNX Runtime CUDA (`CUDA`)**,
 
 ## Setup
 
-**All experiments in this report run on the PC GPU**, in Conda `torch270_py312_cuda`; no Jetson deployment tests are reported. The `trained_models_mdi/` name identifies the CEDAR checkpoint edition, not the execution platform.
+**All experiments in this report run on the PC GPU**, with the software versions listed in the repository README; no Jetson deployment tests are reported. The `trained_models_mdi/` name identifies the CEDAR checkpoint edition, not the execution platform.
 
 The [README environment table](../README.md#installation) lists tested/recommended versions. Compatible general runtime libraries can be used. For raw-I/Q conversion, preserve preprocessing library versions and parameters: even small pixel changes can invalidate pretrained predictions. The recorded RT experiments use the supplied PNGs directly.
 

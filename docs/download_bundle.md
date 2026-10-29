@@ -68,7 +68,7 @@ in nano/small/extra-large sizes, plus three CEDAR-YOLO models with a 20 × 20 gr
 and 100% regression coverage. The CEDAR checkpoints come from the latest local June model collection.
 The recorded RT results use the earlier edition; the new models have not yet been benchmarked.
 The checkpoint edition does not identify the execution platform: **all RT results
-were measured on the PC GPU**, in Conda `torch270_py312_cuda`; there are no Jetson
+were measured on the PC GPU**, with the software versions listed in the repository README; there are no Jetson
 deployment experiments in this report. Tested PC versions are listed in the repository README.
 
 The installer places data in `data/yolo_split/` and weights in `artifacts/weights/`.

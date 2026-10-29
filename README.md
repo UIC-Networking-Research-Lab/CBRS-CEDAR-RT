@@ -89,8 +89,8 @@ Speed-ups are relative to PyTorch GPU FP32 for the same model, batch, scope and 
 
 ## Installation
 
-The tested/recommended environment is the Windows PC Conda environment
-**`torch270_py312_cuda`**, using an **NVIDIA GeForce RTX 2070**:
+The experiments were tested on a Windows PC with an **NVIDIA GeForce RTX 2070**
+and the software versions below:
 
 | Component | Tested PC version |
 |---|---|
@@ -102,9 +102,8 @@ The tested/recommended environment is the Windows PC Conda environment
 | NumPy / SciPy | 2.2.4 / 1.14.1 |
 | Matplotlib / Pillow | 3.10.8 / 11.2.1 |
 
-The Conda environment name does not imply PyTorch 2.7.0; its installed version
-is 2.7.1. Activate this environment if already available. For a new environment,
-use Python 3.12 and install CUDA-compatible PyTorch, ONNX Runtime GPU and TensorRT.
+Use Python 3.12 and install CUDA-compatible PyTorch, ONNX Runtime GPU and TensorRT
+for your platform. The environment name and installation directory are your choice.
 Compatible runtime versions can be used; the table records the tested combination,
 not an exact-version requirement for every dependency. **Raw-I/Q rendering versions
 and parameters require separate care**, as explained below.
