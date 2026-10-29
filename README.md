@@ -1,63 +1,68 @@
 # CBRS-CEDAR-RT
 
-**A derivative project of CBRS-CEDAR-MDI exploring GPU deployment of pretrained CBRS spectrogram detectors.**
+**ONNX Runtime and NVIDIA TensorRT deployment for CBRS radar/LTE detection.**
 
-We reuse the CBRS radar/LTE detectors from
-[CBRS-CEDAR-MDI](https://github.com/UIC-Networking-Research-Lab/CBRS-CEDAR-MDI). The code exports
-the trained models to ONNX and runs them with PyTorch, ONNX Runtime (CUDA and TensorRT
-execution providers) and TensorRT in FP32, FP16 and INT8. For each deployment route it
-measures inference speed and detection quality on the same validation images.
+CBRS-CEDAR-RT converts pretrained YOLO and CEDAR-YOLO detectors into deployable
+ONNX models and TensorRT engines, then measures how runtime, precision and batch
+size affect inference speed and detection quality. It extends
+[CBRS-CEDAR-MDI](https://github.com/UIC-Networking-Research-Lab/CBRS-CEDAR-MDI)
+with a PC GPU deployment and benchmarking pipeline.
 
-Models: 9 original YOLO detectors (`cbrs_yolo{8,11,26}{n,s,x}`) and the 3 CEDAR-YOLO
-detectors (`sig_yolo_v8{n,s,x}_f20t20_c100`). All of them take a 640×640 spectrogram and
-return LTE (class 0) and radar (class 1) boxes.
+The pipeline supports FP32/FP16 export, INT8 calibration with training images,
+ONNX Runtime execution, and direct TensorRT engine building. The evaluation
+compares nine original YOLO models (YOLOv8/YOLO11/YOLO26, n/s/x) and three
+CEDAR-YOLO models. Each detector takes a 640×640 spectrogram and predicts LTE
+(class 0) and radar (class 1) bounding boxes.
 
-**All RT experiments run on the PC GPU; this repository reports no Jetson experiments.**
-Its deployment and quantization results are separate from the paper's Jetson CPU/MDI results. The parent
-repository contains the paper implementation, training and distributed-inference pipelines.
+## Deployment routes
+
+| Route | Execution backend | Precision | Modes |
+|---|---|---|---|
+| **A: ONNX Runtime CUDA** | ONNX graph executed through the CUDA execution provider | FP32, FP16 | `ort_cuda_fp32`, `ort_cuda_fp16` |
+| **B: ONNX Runtime TensorRT** | ONNX Runtime delegates supported graph regions to its TensorRT execution provider | FP16, INT8 | `ort_trt_fp16`, `ort_trt_int8` |
+| **C: Direct TensorRT** | Build a TensorRT engine from ONNX and execute it directly | FP16, INT8 | `trt_fp16`, `trt_int8` |
+| **D: ONNX Runtime CPU** | ONNX graph executed through the CPU execution provider | FP32 | `ort_cpu_fp32` |
+
+The reported **PC GPU study covers routes A–C**, with PyTorch FP32/FP16 as
+reference implementations. Route D provides an optional CPU execution path.
+INT8 routes use calibrated Q/DQ ONNX graphs; FP16 TensorRT routes build from
+FP32 ONNX. The parent project documents model training and Jetson MDI experiments.
 
 ## Results
 
 **288/288 GPU routes completed: 12 models, batches 1, 4, 8, 8 deployment policies.**
 
-**NVIDIA GeForce RTX 2070 · batch 1 · model computation.** Quality uses the **validation split (846 images)**.
+The experiments evaluate 12 pretrained detectors on an **NVIDIA GeForce RTX 2070** PC. The figures show **batch 1, model computation**; quality is evaluated on the same **846 validation images**. INT8 calibration uses 512 training images. Each policy uses the same source checkpoint for its model.
 
-**Inference time per frame (s/frame) ↓ · Detection F1 ↑ · mAP@0.5 ↑**. Time is the inverse of mean throughput; F1 averages LTE and radar box-detection F1.
+### Inference speed
 
-**Example: YOLOv8x, same checkpoint and validation images.**
+![Inference speed across deployment policies](results/figures/overview_model_compute_b001_inference_time_per_frame_s.png)
 
-| Policy | Time (s/frame) ↓ | Detection F1 ↑ | mAP@0.5 ↑ |
-|---|---:|---:|---:|
-| PyTorch FP32 | 0.0412 | 0.9976 | 0.9950 |
-| ORT TRT FP16 | 0.0109 | 0.9976 | 0.9950 |
-| ORT TRT INT8 | 0.0087 | 0.9979 | 0.9950 |
+Inference time per frame is the inverse of mean throughput across the timing rounds; lower is better. Each panel uses its own time scale. CUDA labels denote ONNX Runtime CUDA; TRT denotes direct TensorRT.
 
-<details>
-<summary>All 12 models: inference time, F1 and mAP comparisons</summary>
+ONNX Runtime with TensorRT FP16 (route B) achieves **2.94–6.94× the PyTorch FP32 throughput** across 12 models in this timing scope. Direct TensorRT FP16 (route C) achieves **3.22–7.94× the PyTorch FP32 throughput** across 12 models in this timing scope. For YOLOv8x, ORT CUDA FP16 takes 0.1191 s/frame (route A), compared with 0.0412 s/frame for PyTorch FP32.
 
-![Policy comparison](results/figures/overview_model_compute_b001_inference_time_per_frame_s.png)
+### Detection F1
 
-![Policy comparison](results/figures/overview_model_compute_b001_macro_f1.png)
+![Detection F1 across deployment policies](results/figures/overview_model_compute_b001_macro_f1.png)
 
-![Policy comparison](results/figures/overview_model_compute_b001_map50.png)
+Rows are deployment policies and columns are models. Values average LTE and radar box-detection F1 at confidence 0.25 and box IoU 0.5; higher is better.
 
-</details>
+The TensorRT FP16 routes track each model's PyTorch FP32 quality: the largest absolute detection-F1 change is **0.00085**. INT8 has a larger, model-dependent effect. For YOLO26x, direct TensorRT INT8 changes F1 from **0.9774 to 0.6581**.
 
-FP16 and INT8 can reduce model computation time; compare detection quality alongside speed. The full report also includes preprocessing and image decoding.
+### mAP@0.5
+
+![mAP@0.5 across deployment policies](results/figures/overview_model_compute_b001_map50.png)
+
+The matrix reports mean average precision for LTE and radar boxes at IoU 0.5; higher is better.
+
+Across the TensorRT FP16 routes, the largest absolute mAP@0.5 change from PyTorch FP32 is **0.00008**. The largest mAP@0.5 reduction under direct TensorRT INT8 occurs on YOLO26x: **0.9936 → 0.7624**. INT8 deployment therefore requires validation for each model and batch configuration.
+
+**Deployment assessment.** TensorRT FP16 provides the most consistent combination of faster model execution and preserved detection quality in this testbed. INT8 can further reduce computation time for selected models, with quality checked for the selected configuration. The full report separates model computation, the detector pipeline, and PNG-to-detection execution so application costs can be assessed alongside kernel speed.
 
 [Complete report](results/REPORT.md) · [Combined measurements](results/data/summary.csv) · [Data guide](results/data/README.md)
 
-## Deployment routes
-
-| Mode | Runtime | Model file | Precision |
-|---|---|---|---|
-| `torch_cuda_fp32` / `torch_cuda_fp16` | PyTorch (Ultralytics / CEDAR-YOLO module) | `.pt` | FP32 / FP16 |
-| `ort_cuda_fp32` / `ort_cuda_fp16` (route A) | ONNX Runtime, CUDA EP | FP32 / FP16 ONNX | FP32 / FP16 |
-| `ort_trt_fp16` / `ort_trt_int8` (route B) | ONNX Runtime, TensorRT EP | FP32 ONNX / INT8 Q/DQ ONNX | FP16 / INT8 |
-| `trt_fp16` / `trt_int8` (route C) | TensorRT engine built directly | FP32 ONNX / INT8 Q/DQ ONNX | FP16 / INT8 |
-| `ort_cpu_fp32` (route D) | ONNX Runtime, CPU EP | FP32 ONNX | FP32 |
-
-Timing scopes:
+## Timing scopes
 
 | Scope | Timed work |
 |---|---|

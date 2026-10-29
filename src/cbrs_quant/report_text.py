@@ -6,7 +6,73 @@ import json
 from .analysis import SCOPES
 from .config import MODES, CPU_MODES
 from .report_plots import LABELS, SCOPE_LABELS, model_label
-from .rt_report import fmt, image_link, observations
+from .rt_report import fmt, image_link
+
+
+def overview_sections(rows, overview_files, output, timing_scope):
+    """Explain each visible overview using matched batch-one measurements."""
+    selected = [r for r in rows if int(r['batch']) == 1 and r['scope'] == timing_scope]
+    lookup = {(r['model'], r['mode']): r for r in selected}
+    models = list(dict.fromkeys(r['model'] for r in selected))
+
+    def pairs(mode):
+        return [(lookup[(model, 'torch_cuda_fp32')], lookup[(model, mode)])
+                for model in models if (model, 'torch_cuda_fp32') in lookup and (model, mode) in lookup]
+
+    speed, quality, maps = [], [], []
+    for mode, label in [('ort_trt_fp16', 'ONNX Runtime with TensorRT FP16 (route B)'),
+                        ('trt_fp16', 'Direct TensorRT FP16 (route C)')]:
+        matched = pairs(mode)
+        if matched:
+            ratios = [float(a['inference_time_per_frame_s']) / float(b['inference_time_per_frame_s'])
+                      for a, b in matched]
+            speed.append(f"{label} achieves **{min(ratios):.2f}–{max(ratios):.2f}× the PyTorch FP32 throughput** "
+                         f"across {len(matched)} models in this timing scope.")
+    baseline = lookup.get(('cbrs_yolo8x', 'torch_cuda_fp32'))
+    cuda16 = lookup.get(('cbrs_yolo8x', 'ort_cuda_fp16'))
+    if baseline and cuda16:
+        speed.append(f"For YOLOv8x, ORT CUDA FP16 takes {float(cuda16['inference_time_per_frame_s']):.4f} "
+                     f"s/frame (route A), compared with "
+                     f"{float(baseline['inference_time_per_frame_s']):.4f} s/frame for PyTorch FP32.")
+
+    fp16 = pairs('ort_trt_fp16') + pairs('trt_fp16')
+    f1_deltas = [abs(float(b['macro_f1']) - float(a['macro_f1'])) for a, b in fp16
+                 if a.get('macro_f1') is not None and b.get('macro_f1') is not None]
+    if f1_deltas:
+        quality.append(f"The TensorRT FP16 routes track each model's PyTorch FP32 quality: "
+                       f"the largest absolute detection-F1 change is **{max(f1_deltas):.5f}**.")
+    if fp16:
+        delta = max(abs(float(b['map50']) - float(a['map50'])) for a, b in fp16)
+        maps.append(f"Across the TensorRT FP16 routes, the largest absolute mAP@0.5 change "
+                    f"from PyTorch FP32 is **{delta:.5f}**.")
+    int8 = pairs('trt_int8')
+    if int8:
+        a, b = max(int8, key=lambda pair: float(pair[0]['map50']) - float(pair[1]['map50']))
+        name = model_label(a['model'])
+        if a.get('macro_f1') is not None and b.get('macro_f1') is not None:
+            quality.append(f"INT8 has a larger, model-dependent effect. For {name}, direct TensorRT INT8 "
+                           f"changes F1 from **{float(a['macro_f1']):.4f} to {float(b['macro_f1']):.4f}**.")
+        maps.append(f"The largest mAP@0.5 reduction under direct TensorRT INT8 occurs on {name}: "
+                    f"**{float(a['map50']):.4f} → {float(b['map50']):.4f}**. "
+                    "INT8 deployment therefore requires validation for each model and batch configuration.")
+
+    definitions = [
+        ('inference_time_per_frame_s', 'Inference speed',
+         'Inference time per frame is the inverse of mean throughput across the timing rounds; lower is better. '
+         'Each panel uses its own time scale. CUDA labels denote ONNX Runtime CUDA; TRT denotes direct TensorRT.', speed),
+        ('macro_f1', 'Detection F1',
+         'Rows are deployment policies and columns are models. Values average LTE and radar box-detection F1 '
+         'at confidence 0.25 and box IoU 0.5; higher is better.', quality),
+        ('map50', 'mAP@0.5',
+         'The matrix reports mean average precision for LTE and radar boxes at IoU 0.5; higher is better.', maps)]
+    sections = []
+    for metric, title, caption, findings in definitions:
+        files = next((group for group in overview_files if any(p.stem.endswith('_' + metric) for p in group)), [])
+        if not files:
+            continue
+        figure = image_link(files, output).replace('Policy comparison', title + ' across deployment policies')
+        sections.extend([f'### {title}', '', figure, '', caption, '', ' '.join(findings), ''])
+    return sections
 
 
 def write_reports(bundle, rows, routes, charts, overview_files, output):
@@ -44,10 +110,12 @@ def write_reports(bundle, rows, routes, charts, overview_files, output):
         "| mAP@0.5:0.95 ↑ | Mean AP over IoU thresholds 0.50 to 0.95; retained in all detailed tables. |",
         "| p50 / p95 / p99 | Per-batch request latency percentiles in milliseconds, averaged across rounds. |", "",
         "Quality is evaluated once for each model/batch/policy. Repeated quality columns across timing scopes refer to that same evaluation.", "",
-        "## Results", "", *observations(rows), "",
-        "Vertical bars compare inference time per frame. Annotated matrices compare F1 and mAP. Quality colors span 0–1; timing panels use a separate scale for each model.", ""]
-    for files in overview_files:
-        parts.extend([image_link(files, output), ""])
+        "## Results", "",
+        "The three figures below compare inference speed, detection F1 and mAP@0.5 at batch 1. "
+        "The detailed tables cover all evaluated batch sizes and timing scopes.", ""]
+    overview_scope = overview_files[0][0].stem.split("_b")[0].removeprefix("overview_") if overview_files else "model_compute"
+    overview = overview_sections(rows, overview_files, output, overview_scope)
+    parts.extend(overview)
     parts.extend(["## Completion and data audit", "", "| Batch | Completed GPU routes | Remaining |", "|---:|---:|---:|"])
     for batch in scope["batches"]:
         group = [r for r in selected_routes if int(r["batch"]) == batch]
@@ -83,25 +151,17 @@ def write_reports(bundle, rows, routes, charts, overview_files, output):
         '```python\nimport sys\nsys.path.insert(0, "src")\nfrom cbrs_quant.results_store import table\nsummary = table("results", "summary")\nrounds = table("results", "rounds")\n```', "",
         "See [data/README.md](data/README.md) for file schemas, scope filtering and provenance.", ""])
     (output / "REPORT.md").write_text("\n".join(parts),encoding="utf-8")
-    overview_scope = overview_files[0][0].stem.split("_b")[0].removeprefix("overview_") if overview_files else "model_compute"
     summary = ["## Results", "", completion, "",
-        f"**{env.get('gpu','Recorded GPU')} · batch 1 · {SCOPE_LABELS.get(overview_scope,overview_scope).lower()}.** Quality uses the **{split} split ({', '.join(map(str,images))} images)**.", "",
-        "**Inference time per frame (s/frame) ↓ · Detection F1 ↑ · mAP@0.5 ↑**. Time is the inverse of mean throughput; F1 averages LTE and radar box-detection F1.", ""]
-    example = [r for r in rows if r['model']=='cbrs_yolo8x' and int(r['batch'])==1 and r['scope']==overview_scope
-               and r['mode'] in ('torch_cuda_fp32','ort_trt_fp16','ort_trt_int8')]
-    if len(example)==3:
-        summary.extend(['**Example: YOLOv8x, same checkpoint and validation images.**', '',
-                        '| Policy | Time (s/frame) ↓ | Detection F1 ↑ | mAP@0.5 ↑ |',
-                        '|---|---:|---:|---:|'])
-        for row in example:
-            summary.append(f"| {LABELS[row['mode']]} | {fmt(row['inference_time_per_frame_s'],4)} | {fmt(row['macro_f1'],4)} | {fmt(row['map50'],4)} |")
-        summary.append('')
-    summary.extend(['<details>', '<summary>All 12 models: inference time, F1 and mAP comparisons</summary>', ''])
-    for files in overview_files:
-        summary.extend([image_link(files,output), ""])
-    summary.extend(['</details>', ''])
-    summary.extend(["FP16 and INT8 can reduce model computation time; compare detection quality alongside speed. The full report also includes preprocessing and image decoding.", "",
-        "[Complete report](REPORT.md) · [Combined measurements](data/summary.csv) · [Data guide](data/README.md)", ""])
+        f"The experiments evaluate {len(scope['models'])} pretrained detectors on an **{env.get('gpu','recorded GPU')}** PC. "
+        f"The figures show **batch 1, {SCOPE_LABELS.get(overview_scope,overview_scope).lower()}**; "
+        f"quality is evaluated on the same **{', '.join(map(str,images))} {split} images**. "
+        "INT8 calibration uses 512 training images. Each policy uses the same source checkpoint for its model.", "",
+        *overview,
+        "**Deployment assessment.** TensorRT FP16 provides the most consistent combination of faster model "
+        "execution and preserved detection quality in this testbed. INT8 can further reduce computation time "
+        "for selected models, with quality checked for the selected configuration. The full report separates "
+        "model computation, the detector pipeline, and PNG-to-detection execution so application costs can be assessed alongside kernel speed.", "",
+        "[Complete report](REPORT.md) · [Combined measurements](data/summary.csv) · [Data guide](data/README.md)", ""]
     (output / "SUMMARY.md").write_text("\n".join(summary),encoding="utf-8")
     guide = """# Consolidated experiment data
 

@@ -37,17 +37,31 @@ Quality is evaluated once for each model/batch/policy. Repeated quality columns 
 
 ## Results
 
-- **FP16 model computation:** direct TensorRT FP16 reduces time per frame by 69.0–87.4% versus PyTorch FP32 across 12 models at batch 1. The largest absolute mAP@0.5 change is 0.00004, and the largest detection-F1 change is 0.00085.
-- **INT8 quality depends on the model:** YOLO26x shows the largest batch-1 mAP@0.5 reduction among direct INT8 routes: 0.9936 → 0.7624. Detection F1 changes from 0.9774 to 0.6581. The detailed reports also show batch-dependent quality changes.
-- **Full image inference has a different result:** with PNG decoding and preprocessing included, direct TensorRT FP16 reduces time per frame in 6 of 12 batch-1 comparisons. The forward-pass gain should therefore be read together with the full-pipeline measurements.
+The three figures below compare inference speed, detection F1 and mAP@0.5 at batch 1. The detailed tables cover all evaluated batch sizes and timing scopes.
 
-Vertical bars compare inference time per frame. Annotated matrices compare F1 and mAP. Quality colors span 0–1; timing panels use a separate scale for each model.
+### Inference speed
 
-![Policy comparison](figures/overview_model_compute_b001_inference_time_per_frame_s.png)
+![Inference speed across deployment policies](figures/overview_model_compute_b001_inference_time_per_frame_s.png)
 
-![Policy comparison](figures/overview_model_compute_b001_macro_f1.png)
+Inference time per frame is the inverse of mean throughput across the timing rounds; lower is better. Each panel uses its own time scale. CUDA labels denote ONNX Runtime CUDA; TRT denotes direct TensorRT.
 
-![Policy comparison](figures/overview_model_compute_b001_map50.png)
+ONNX Runtime with TensorRT FP16 (route B) achieves **2.94–6.94× the PyTorch FP32 throughput** across 12 models in this timing scope. Direct TensorRT FP16 (route C) achieves **3.22–7.94× the PyTorch FP32 throughput** across 12 models in this timing scope. For YOLOv8x, ORT CUDA FP16 takes 0.1191 s/frame (route A), compared with 0.0412 s/frame for PyTorch FP32.
+
+### Detection F1
+
+![Detection F1 across deployment policies](figures/overview_model_compute_b001_macro_f1.png)
+
+Rows are deployment policies and columns are models. Values average LTE and radar box-detection F1 at confidence 0.25 and box IoU 0.5; higher is better.
+
+The TensorRT FP16 routes track each model's PyTorch FP32 quality: the largest absolute detection-F1 change is **0.00085**. INT8 has a larger, model-dependent effect. For YOLO26x, direct TensorRT INT8 changes F1 from **0.9774 to 0.6581**.
+
+### mAP@0.5
+
+![mAP@0.5 across deployment policies](figures/overview_model_compute_b001_map50.png)
+
+The matrix reports mean average precision for LTE and radar boxes at IoU 0.5; higher is better.
+
+Across the TensorRT FP16 routes, the largest absolute mAP@0.5 change from PyTorch FP32 is **0.00008**. The largest mAP@0.5 reduction under direct TensorRT INT8 occurs on YOLO26x: **0.9936 → 0.7624**. INT8 deployment therefore requires validation for each model and batch configuration.
 
 ## Completion and data audit
 
