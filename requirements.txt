@@ -1,4 +1,4 @@
-# Tested PC environment: Python 3.12, Conda torch270_py312_cuda (README.md).
+# Tested PC environment: Python 3.12; tested library versions are listed in README.md.
 # Run from the repository root:
 #   python -m pip install -r requirements.txt
 # Install platform-matched PyTorch/torchvision, ONNX Runtime GPU and TensorRT
