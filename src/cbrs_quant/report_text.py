@@ -20,8 +20,8 @@ def overview_sections(rows, overview_files, output, timing_scope):
                 for model in models if (model, 'torch_cuda_fp32') in lookup and (model, mode) in lookup]
 
     speed, quality, maps = [], [], []
-    for mode, label in [('ort_trt_fp16', 'ONNX Runtime with TensorRT FP16 (route B)'),
-                        ('trt_fp16', 'Direct TensorRT FP16 (route C)')]:
+    for mode, label in [('ort_trt_fp16', 'ONNX Runtime with TensorRT FP16'),
+                        ('trt_fp16', 'Direct TensorRT FP16')]:
         matched = pairs(mode)
         if matched:
             ratios = [float(a['inference_time_per_frame_s']) / float(b['inference_time_per_frame_s'])
@@ -32,7 +32,7 @@ def overview_sections(rows, overview_files, output, timing_scope):
     cuda16 = lookup.get(('cbrs_yolo8x', 'ort_cuda_fp16'))
     if baseline and cuda16:
         speed.append(f"For YOLOv8x, ORT CUDA FP16 takes {float(cuda16['inference_time_per_frame_s']):.4f} "
-                     f"s/frame (route A), compared with "
+                     f"s/frame, compared with "
                      f"{float(baseline['inference_time_per_frame_s']):.4f} s/frame for PyTorch FP32.")
 
     fp16 = pairs('ort_trt_fp16') + pairs('trt_fp16')

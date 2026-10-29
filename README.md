@@ -21,19 +21,23 @@ compares nine original YOLO models (YOLOv8/YOLO11/YOLO26, n/s/x) and three
 CEDAR-YOLO models. Each detector takes a 640×640 spectrogram and predicts LTE
 (class 0) and radar (class 1) bounding boxes.
 
-## Deployment routes
+## Deployment backends compared in the figures
 
-| Route | Execution backend | Precision | Modes |
-|---|---|---|---|
-| **A: ONNX Runtime CUDA** | ONNX graph executed through the CUDA execution provider | FP32, FP16 | `ort_cuda_fp32`, `ort_cuda_fp16` |
-| **B: ONNX Runtime TensorRT** | ONNX Runtime delegates supported graph regions to its TensorRT execution provider | FP16, INT8 | `ort_trt_fp16`, `ort_trt_int8` |
-| **C: Direct TensorRT** | Build a TensorRT engine from ONNX and execute it directly | FP16, INT8 | `trt_fp16`, `trt_int8` |
-| **D: ONNX Runtime CPU** | ONNX graph executed through the CPU execution provider | FP32 | `ort_cpu_fp32` |
+The figures compare **four GPU backends**, each with two precision settings.
+The table follows their left-to-right order in the speed plots.
 
-The reported **PC GPU study covers routes A–C**, with PyTorch FP32/FP16 as
-reference implementations. Route D provides an optional CPU execution path.
-INT8 routes use calibrated Q/DQ ONNX graphs; FP16 TensorRT routes build from
-FP32 ONNX. The parent project documents model training and Jetson MDI experiments.
+| Backend | Figure label | Execution | Precision | Modes |
+|---|---|---|---|---|
+| **PyTorch** | `Torch` | Execute the pretrained model directly with PyTorch on the GPU | FP32, FP16 | `torch_cuda_fp32`, `torch_cuda_fp16` |
+| **ONNX Runtime CUDA** | `CUDA` | Execute the exported ONNX graph with the CUDA execution provider | FP32, FP16 | `ort_cuda_fp32`, `ort_cuda_fp16` |
+| **ONNX Runtime TensorRT** | `ORT TRT` | ONNX Runtime delegates supported graph regions to its TensorRT execution provider | FP16, INT8 | `ort_trt_fp16`, `ort_trt_int8` |
+| **Direct TensorRT** | `TRT` | Build a TensorRT engine from ONNX and execute it directly | FP16, INT8 | `trt_fp16`, `trt_int8` |
+
+**All reported results are GPU measurements; no CPU experiments are included.**
+PyTorch FP32 is the speed-up reference. INT8 deployment uses calibrated Q/DQ ONNX
+graphs; FP16 TensorRT engines are built from FP32 ONNX. ONNX Runtime TensorRT
+and direct TensorRT are separate deployment paths, as shown by `ORT TRT` and
+`TRT` in the figures.
 
 ## Results
 
@@ -47,7 +51,7 @@ The experiments evaluate 12 pretrained detectors on an **NVIDIA GeForce RTX 2070
 
 Inference time per frame is the inverse of mean throughput across the timing rounds; lower is better. Each panel uses its own time scale. CUDA labels denote ONNX Runtime CUDA; TRT denotes direct TensorRT.
 
-ONNX Runtime with TensorRT FP16 (route B) achieves **2.94–6.94× the PyTorch FP32 throughput** across 12 models in this timing scope. Direct TensorRT FP16 (route C) achieves **3.22–7.94× the PyTorch FP32 throughput** across 12 models in this timing scope. For YOLOv8x, ORT CUDA FP16 takes 0.1191 s/frame (route A), compared with 0.0412 s/frame for PyTorch FP32.
+ONNX Runtime with TensorRT FP16 achieves **2.94–6.94× the PyTorch FP32 throughput** across 12 models in this timing scope. Direct TensorRT FP16 achieves **3.22–7.94× the PyTorch FP32 throughput** across 12 models in this timing scope. For YOLOv8x, ORT CUDA FP16 takes 0.1191 s/frame, compared with 0.0412 s/frame for PyTorch FP32.
 
 ### Detection F1
 
