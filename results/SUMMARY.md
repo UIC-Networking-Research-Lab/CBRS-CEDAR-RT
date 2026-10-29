@@ -1,5 +1,7 @@
 ## Results
 
+> **Historical results:** The figures and tables below use the previous CEDAR checkpoint edition and box-detection macro F1. They have not been rerun with the updated weights or Overlap F1. New runs use the June model collection and report frame-level Overlap F1; these measurements must be reported separately.
+
 **288/288 GPU configurations completed: 12 models, batches 1, 4, 8, 8 deployment policies.**
 
 The experiments evaluate 12 pretrained detectors on an **NVIDIA GeForce RTX 2070** PC. The figures show **batch 1, model computation**; quality is evaluated on the same **846 validation images**. INT8 calibration uses 512 training images. Each policy uses the same source checkpoint for its model.

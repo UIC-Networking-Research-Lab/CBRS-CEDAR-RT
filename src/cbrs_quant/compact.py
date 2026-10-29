@@ -21,11 +21,12 @@ RESULT_FIELDS = ("model", "batch", "mode", "status", "scope", "round", "executio
                  "started_at", "finished_at", "elapsed_seconds", "phase", "error", "smoke_passed",
                  "smoke_records", "evaluated_images", "map50", "map50_95",
                  *(f"{name}_{field}" for name in ("lte", "radar") for field in CLASS_FIELDS),
+                 *("overlap_" + k for k in ("TP", "TN", "FP", "FN", "precision", "recall", "f1", "accuracy")),
                  "load_seconds", "builder_optimization_level", "timing_signature", "quality_signature", *ROUND_FIELDS)
 COMPARISON_FIELDS = ("model", "batch", "mode", "scope", "rounds", "images_per_second_mean",
                      "images_per_second_std", "p50_ms_mean", "p95_ms_mean", "p99_ms_mean",
                      "speedup_vs_torch_fp32", "map50", "map50_95", "map50_95_delta_pp",
-                     "radar_recall", "builder_optimization_level", "timing_signature", "quality_signature", "baseline_status")
+                     "radar_recall", "overlap_f1", "builder_optimization_level", "timing_signature", "quality_signature", "baseline_status")
 CORE_FILES = tuple(f"cbrs_quant/{name}.py" for name in
                    ("config", "data", "engine", "export", "io", "metrics", "models", "ort_backend",
                     "postprocess", "runner", "runtime", "smoke", "sweep")) + ("cbrs_quant/vendor/asym_yolo.py",)
@@ -126,6 +127,7 @@ def route_rows(model, batch, mode, status, reports, info):
             "map50": metrics.get("map50", ""), "map50_95": metrics.get("map50_95", ""),
             "load_seconds": evaluation.get("load_seconds", ""),
             "quality_signature": quality_signature(evaluation, info.get("inference_code_sha256")) if evaluation else ""}
+    base.update({"overlap_" + k: v for k, v in metrics.get("overlap", {}).items()})
     for name in ("LTE", "Radar"):
         values = metrics.get("classes", {}).get(name, {})
         base.update({f"{name.lower()}_{field}": values.get(field, "") for field in CLASS_FIELDS})
@@ -197,6 +199,7 @@ def comparisons(meta, rows, baseline="torch_cuda_fp32"):
                 **{f"p{n}_ms_mean": statistics.mean(float(row[f"latency_ms_p{n}"]) for row in trials) for n in (50, 95, 99)},
                 "map50": first.get("map50", ""), "map50_95": first.get("map50_95", ""),
                 "radar_recall": first.get("radar_recall", ""),
+                "overlap_f1": first.get("overlap_f1", ""),
                 "builder_optimization_level": first.get("builder_optimization_level", ""),
                 "timing_signature": first.get("timing_signature", ""),
                 "quality_signature": first.get("quality_signature", ""), "baseline_status": "missing"}

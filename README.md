@@ -43,6 +43,8 @@ and direct TensorRT are separate deployment paths, as shown by `ORT TRT` and
 
 ## Results
 
+> **Historical results:** The figures and tables below use the previous CEDAR checkpoint edition and box-detection macro F1. They have not been rerun with the updated weights or Overlap F1. New runs use the June model collection and report frame-level Overlap F1; these measurements must be reported separately.
+
 **288/288 GPU configurations completed: 12 models, batches 1, 4, 8, 8 deployment policies.**
 
 The experiments evaluate 12 pretrained detectors on an **NVIDIA GeForce RTX 2070** PC. The figures show **batch 1, model computation**; quality is evaluated on the same **846 validation images**. INT8 calibration uses 512 training images. Each policy uses the same source checkpoint for its model.
@@ -115,7 +117,7 @@ python cli.py doctor --require cuda tensorrt     # checks the available ORT prov
 
 ## Get weights and data
 
-**[Download CBRS-CEDAR-RT-ASSETS v1.0 from GitHub Releases](https://github.com/UIC-Networking-Research-Lab/CBRS-CEDAR-RT/releases/tag/assets)**
+**[Download CBRS-CEDAR-RT-ASSETS from GitHub Releases](https://github.com/UIC-Networking-Research-Lab/CBRS-CEDAR-RT/releases/tag/assets)**
 
 1. Open the release's **Assets** list and download **all 3 archive parts**:
    `CBRS-CEDAR-RT-ASSETS.7z.001` through `CBRS-CEDAR-RT-ASSETS.7z.003`.
@@ -160,10 +162,13 @@ the matrix of 288 model/batch/backend-precision configurations. Add `--dry-run` 
 
 The installer places PNGs in `data/yolo_split/`, weights in `artifacts/weights/`, and
 runtime metadata in `artifacts/`. Reference checksums are maintained in this repository.
-It rejects existing files with different contents.
-**The RT reference experiments use the earlier Jetson-era CEDAR checkpoints**, not the
-later local/sweep checkpoints. This names the checkpoint edition, **not the RT
-execution platform: these deployment tests ran on the PC GPU**.
+It replaces only recognized previous CEDAR checkpoints; other mismatched files are rejected.
+**New runs use the latest local CEDAR checkpoints from the June model collection**,
+for nano, small and extra-large at a 20 x 20 feature grid and full coverage.
+The extra-large file is byte-identical to the previous RT checkpoint; nano and small are updated.
+The nine original YOLO checkpoints are unchanged. The installer upgrades recognized
+old CEDAR weights and checks every downloaded file. Start a new run; do not resume
+an old run or reuse ONNX graphs/TensorRT engines exported from different weights.
 This package includes its own copy of every required
 weight and dataset file; no MDI checkout or MDI asset package is needed.
 
@@ -201,10 +206,17 @@ PC renderer uses NumPy 2.2.4, SciPy 1.14.1, Matplotlib 3.10.8 and Pillow 11.2.1.
 The parent project's [preprocessing guide](https://github.com/UIC-Networking-Research-Lab/CBRS-CEDAR-MDI/blob/main/docs/preprocessing.md)
 documents the full contract and a pixel-comparison check. The RT experiments use
 supplied PNGs; they do not include raw-I/Q conversion. A custom conversion workflow
-must pass pixel checks first. F1 here is **box-detection macro F1**, not the
-parent paper's frame-level overlap F1.
+must pass pixel checks first. New evaluations report frame-level **Overlap F1**,
+using the same frequency-overlap decision as MDI, on the RT validation split.
 
 ## Run the experiments
+
+New evaluations use **Overlap F1** for the frame-level CBRS decision
+and **mAP@0.5** for box localization quality. A frame is overlap-positive when
+any predicted LTE/radar pair has a positive-width intersection along frequency;
+the time-axis intersection is not required. Detections are filtered at confidence
+0.25, and F1 is computed from confusion counts pooled over all validation frames.
+This is the same decision rule as MDI, on the RT validation split.
 
 ```bash
 python run_experiments.py --dry-run                                  # show the plan only
@@ -355,3 +367,7 @@ results/                reference results of the run above
 
 [GNU AGPL-3.0](LICENSE). This project uses [Ultralytics](https://github.com/ultralytics/ultralytics)
 (AGPL-3.0). ONNX Runtime, TensorRT and the dataset keep their own licenses.
+
+### Overlap F1 in new runs
+
+A frame is positive when any LTE/radar box pair intersects with positive width along the frequency axis, irrespective of time overlap. Predicted boxes use confidence 0.25. F1 is computed from pooled frame-level TP/FP/FN counts. Box mAP remains a separate localization metric. Old box-detection F1 cannot be relabeled as Overlap F1. The report generator rejects runs without this metric, preserving the archived figures. No experiments were rerun for this model/code update.

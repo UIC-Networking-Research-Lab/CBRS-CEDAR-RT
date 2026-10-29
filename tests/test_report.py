@@ -47,6 +47,17 @@ class ReportTests(unittest.TestCase):
             row["radar_f1"] = ""
         self.assertIsNone(enrich(self.meta, self.rows)[0]["macro_f1"])
 
+    def test_overlap_is_separate_from_box_f1(self):
+        for row in self.rows:
+            row.update(overlap_f1='0.99', overlap_TP='495', overlap_FP='5',
+                       overlap_FN='5', overlap_TN='341')
+        result = enrich(self.meta, self.rows)[0]
+        self.assertAlmostEqual(result['overlap_f1'], .99)
+        self.assertAlmostEqual(result['macro_f1'], .8)
+
+    def test_missing_overlap_is_not_replaced_with_detection_f1(self):
+        self.assertIsNone(enrich(self.meta, self.rows)[0]['overlap_f1'])
+
     def test_public_bundle_reproduces_aggregate_values(self):
         with tempfile.TemporaryDirectory() as temp:
             output = Path(temp) / "report"

@@ -67740,14 +67740,20 @@
     {
       "source": "weights/sig_yolo_v8n_f20t20_c100.pt",
       "destination": "artifacts/weights/sig_yolo_v8n_f20t20_c100.pt",
-      "bytes": 29883182,
-      "sha256": "71b1099aa76c5165495886c16451f7bb573a48b95e7883bb4ce48eb741bc9744"
+      "bytes": 22424240,
+      "sha256": "4df7a110d9050def5ce3ed19d29d94b1c35a0f385e8f436b727a77d580650ec1",
+      "replaces_sha256": [
+        "71b1099aa76c5165495886c16451f7bb573a48b95e7883bb4ce48eb741bc9744"
+      ]
     },
     {
       "source": "weights/sig_yolo_v8s_f20t20_c100.pt",
       "destination": "artifacts/weights/sig_yolo_v8s_f20t20_c100.pt",
-      "bytes": 116581550,
-      "sha256": "ad1d8c2c6c37a3806d94a165e28a29e7f6b1640464bb1b6e946d17112b0f6654"
+      "bytes": 87460144,
+      "sha256": "adfe6895108c6e42d29b829c9af699a9191170fcd1a536b570264a5325f232e0",
+      "replaces_sha256": [
+        "ad1d8c2c6c37a3806d94a165e28a29e7f6b1640464bb1b6e946d17112b0f6654"
+      ]
     },
     {
       "source": "weights/sig_yolo_v8x_f20t20_c100.pt",
@@ -112920,5 +112926,6 @@
     ],
     "records_sha256": "4215547c756558667c4a4f1f77370207e0f45828581162c7df5f3466f4897f3c",
     "schema": 1
-  }
+  },
+  "cedar_checkpoint_edition": "local_latest_2026_06"
 }

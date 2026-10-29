@@ -9,7 +9,7 @@ from PIL import Image
 
 from cbrs_quant.data import Dataset, load_labels, load_png, make_manifest
 from cbrs_quant.io import fingerprint, read_json, reserve_output, write_json
-from cbrs_quant.metrics import match, summarize
+from cbrs_quant.metrics import match, summarize, frequency_overlap, overlap_summary
 
 
 class Contracts(unittest.TestCase):
@@ -86,6 +86,26 @@ class Contracts(unittest.TestCase):
 
 
 class Metrics(unittest.TestCase):
+    def test_overlap_ignores_time_but_requires_positive_frequency_width(self):
+        boxes = np.array([[0, 0, 10, 1], [5, 50, 15, 60]], dtype=float)
+        self.assertTrue(frequency_overlap(boxes, np.array([0, 1])))
+        boxes[1, 0] = 10
+        self.assertFalse(frequency_overlap(boxes, np.array([0, 1])))
+        self.assertFalse(frequency_overlap(boxes, np.array([0, 0])))
+
+    def test_overlap_pools_frame_counts_not_box_f1(self):
+        positive = np.array([[0, 0, 0, 10, 10], [1, 5, 50, 15, 60]], dtype=float)
+        negative = positive.copy()
+        negative[1, 1] = 10
+        pred = np.array([[0, 0, 10, 10, .9, 0], [5, 50, 15, 60, .9, 1]])
+        low_conf = pred.copy()
+        low_conf[1, 4] = .1
+        empty = np.empty((0, 6))
+        result = overlap_summary([(pred, positive), (pred, negative),
+                                  (low_conf, positive), (empty, negative)])
+        self.assertEqual([result[k] for k in ('TP', 'TN', 'FP', 'FN')], [1, 1, 1, 1])
+        self.assertAlmostEqual(result['f1'], .5)
+
     def test_operating_confidence_must_be_collected(self):
         for confidence in (-1, 0, .0001, 2):
             with self.assertRaises(ValueError):

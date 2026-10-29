@@ -9,6 +9,7 @@ from pathlib import Path
 import shutil
 
 CORE_FILES = ("metadata.json", "rounds.csv", "dataset.json", "history.jsonl")
+SUPPLEMENT_FILES = ("overlap_evaluations.csv",)
 
 
 def digest(path):
@@ -57,6 +58,35 @@ def load_data(path, baseline="torch_cuda_fp32"):
         if meta["model_id"] != model:
             raise ValueError(f"Metadata model identifier mismatch: {model}")
         models[model] = {"meta": meta, "raw": groups[model], "rows": enrich(meta, groups[model], baseline)}
+    supplement = directory / "overlap_evaluations.csv"
+    if supplement.exists():
+        manifest = verify(directory)
+        if supplement.name not in {r['path'] for r in manifest['files']}:
+            raise ValueError('Overlap supplement is not covered by the result manifest')
+        with supplement.open(encoding='utf-8', newline='') as stream:
+            records = list(csv.DictReader(stream))
+        lookup = {(r['model'], int(r['batch']), r['mode']): r for r in records}
+        if len(lookup) != len(records):
+            raise ValueError('Duplicate overlap evaluation')
+        for model, item in models.items():
+            for row in item['rows']:
+                if not included(row, metadata['report_scope']):
+                    continue
+                record = lookup.get((model, int(row['batch']), row['mode']))
+                if record is None:
+                    raise ValueError(f'Missing overlap evaluation: {model}/{row["batch"]}/{row["mode"]}')
+                if (record['weights_sha256'] != item['meta']['checkpoint_sha256'] or
+                    record['dataset_sha256'] != item['meta']['dataset']['records_sha256'] or
+                    record['split'] != row['evaluation_split'] or
+                    int(record['images']) != int(row['evaluated_images'])):
+                    raise ValueError('Overlap evaluation uses different weights, dataset or split')
+                counts = {k: int(record['overlap_' + k]) for k in ('TP', 'TN', 'FP', 'FN')}
+                if sum(counts.values()) != int(record['images']):
+                    raise ValueError('Overlap confusion counts do not cover the dataset')
+                denominator = 2*counts['TP'] + counts['FP'] + counts['FN']
+                row.update({'overlap_' + k: v for k, v in counts.items()})
+                row['overlap_f1'] = 2*counts['TP'] / max(1, denominator)
+                row['overlap_evaluated_at_utc'] = record['evaluated_at_utc']
     return {"models": models, "order": metadata["model_order"], "run_name": metadata["run_name"],
             "source": metadata.get("source_evidence", []), "baseline": baseline,
             "report_scope": metadata["report_scope"], "data_directory": directory}
@@ -75,7 +105,7 @@ def export_data(bundle, directory, dataset_manifest=None):
     source = bundle.get("data_directory")
     if source:
         if source.resolve() != directory.resolve():
-            for name in CORE_FILES:
+            for name in (*CORE_FILES, *SUPPLEMENT_FILES):
                 if (source / name).is_file():
                     shutil.copy2(source / name, directory / name)
         return
@@ -109,7 +139,7 @@ def seal(directory, audit=None):
     previous = directory / "manifest.json"
     if audit is None and previous.exists():
         audit = json.loads(previous.read_text(encoding="utf-8")).get("audit", {})
-    names = [*CORE_FILES, "summary.csv", "routes.csv"]
+    names = [*CORE_FILES, *SUPPLEMENT_FILES, "summary.csv", "routes.csv"]
     files = [{"path": name, "sha256": digest(directory/name), "bytes": (directory/name).stat().st_size}
              for name in names if (directory/name).is_file()]
     modules = ("results_store.py", "rt_report.py", "report_text.py", "report_plots.py", "compact.py")

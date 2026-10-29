@@ -20,7 +20,7 @@ class ResultsStoreTests(unittest.TestCase):
               "routes":{"1:torch_cuda_fp32":{"status":"passed"}},"environments":{},"dataset":{"records_sha256":"abc"}}
         raw=[{"model":"cbrs_yolo8n","batch":"1","mode":"torch_cuda_fp32","status":"passed","scope":"model_compute",
               "round":str(i+1),"images_per_second":str(rate),"latency_ms_p50":"8","latency_ms_p95":"9","latency_ms_p99":"10",
-              "map50":".95","map50_95":".8","lte_f1":".7","radar_f1":".9","radar_recall":".9",
+              "map50":".95","map50_95":".8","overlap_f1":".99","lte_f1":".7","radar_f1":".9","radar_recall":".9",
               "timing_signature":"timing","quality_signature":"quality","evaluated_images":"846"} for i,rate in enumerate((100,200,300))]
         self.bundle={"models":{"cbrs_yolo8n":{"meta":meta,"raw":raw}},"order":["cbrs_yolo8n"],"source":[],"run_name":"fixture",
                      "report_scope":{"models":["cbrs_yolo8n"],"batches":[1],"modes":["torch_cuda_fp32"]}}
@@ -33,6 +33,29 @@ class ResultsStoreTests(unittest.TestCase):
         self.assertEqual(loaded["models"]["cbrs_yolo8n"]["raw"],original["raw"])
         self.assertEqual(loaded["models"]["cbrs_yolo8n"]["rows"],enrich(original["meta"],original["raw"]))
         self.assertEqual(table(self.output,"rounds"),original["raw"])
+
+    def test_overlap_supplement_preserves_timing_and_box_metrics(self):
+        from cbrs_quant.rt_report import write_csv
+        meta_path = self.data / "metadata.json"
+        metadata = json.loads(meta_path.read_text())
+        metadata["models"]["cbrs_yolo8n"]["checkpoint_sha256"] = "weights"
+        meta_path.write_text(json.dumps(metadata))
+        original = digest(self.data / "rounds.csv")
+        record = {"model": "cbrs_yolo8n", "batch": 1, "mode": "torch_cuda_fp32",
+                  "weights_sha256": "weights", "dataset_sha256": "abc", "split": "val",
+                  "images": 846, "overlap_TP": 548, "overlap_TN": 295,
+                  "overlap_FP": 1, "overlap_FN": 2, "evaluated_at_utc": "fixture"}
+        write_csv(self.data / "overlap_evaluations.csv", [record])
+        seal(self.data)
+        row = load_data(self.output)["models"]["cbrs_yolo8n"]["rows"][0]
+        self.assertAlmostEqual(row["overlap_f1"], 1096/1099)
+        self.assertAlmostEqual(row["macro_f1"], .8)
+        self.assertEqual(digest(self.data / "rounds.csv"), original)
+        record["weights_sha256"] = "different"
+        write_csv(self.data / "overlap_evaluations.csv", [record])
+        seal(self.data)
+        with self.assertRaisesRegex(ValueError, "different weights"):
+            load_data(self.output)
 
     def test_checksum_rejects_changed_measurements(self):
         p=self.data/"rounds.csv"

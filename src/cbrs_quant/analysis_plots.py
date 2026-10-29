@@ -24,7 +24,7 @@ def render(snapshot, quality, timings, output, baseline, formats=("png", "pdf"),
         q = quality_lookup.get((row["model"], row["batch"], row["mode"], row.get("quality_signature")), {})
         row["inference_time_per_frame_s"] = 1 / float(row["images_per_second_mean"])
         fs = [q.get("lte_f1"), q.get("radar_f1")]
-        row["macro_f1"] = sum(fs)/2 if all(v is not None for v in fs) else None
+        row["overlap_f1"] = q.get("overlap_f1")
         row["map50"] = q.get("map50")
         groups[(row["model"], row["scope"], row.get("timing_signature", ""), row.get("quality_signature", ""))].append(row)
     for (model, scope, signature, qsig), rows in groups.items():

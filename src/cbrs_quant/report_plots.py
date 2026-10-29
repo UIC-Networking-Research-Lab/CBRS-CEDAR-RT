@@ -23,7 +23,7 @@ COLORS = {
 }
 METRICS = (
     ("inference_time_per_frame_s", "Inference time per frame (s/frame)", "Lower is better"),
-    ("macro_f1", "Detection F1", "Higher is better"),
+    ("overlap_f1", "Overlap F1", "Higher is better"),
     ("map50", "mAP@0.5", "Higher is better"),
 )
 SCOPE_LABELS = {
@@ -155,7 +155,7 @@ def model_chart(model, rows, output, scope, formats=("png","pdf"),dpi=180,suffix
         ax.set_title(f"Batch {batch}",loc="left",fontsize=12,weight="bold",pad=14)
     bottom=outer[1].subgridspec(1,2,wspace=.42)
     lookup={(r["mode"],int(r["batch"])):r for r in rows}
-    for i,(field,title) in enumerate((("macro_f1","Detection F1"),("map50","mAP@0.5"))):
+    for i,(field,title) in enumerate((("overlap_f1","Overlap F1"),("map50","mAP@0.5"))):
         ax=fig.add_subplot(bottom[0,i])
         values=[[numeric(lookup.get((m,b),{}).get(field)) for b in batches] for m in modes]
         im=draw_quality(ax,values,[f"Batch {b}" for b in batches],modes,title,fontsize=10)
@@ -165,7 +165,7 @@ def model_chart(model, rows, output, scope, formats=("png","pdf"),dpi=180,suffix
     fig.suptitle(f"{model_label(model)}  |  {SCOPE_LABELS[scope]}",x=.035,y=.98,
                  ha="left",fontsize=18,weight="bold")
     fig.text(.035,.935,"Inference time per frame (s/frame)  ·  lower is better",fontsize=11,color="#617385")
-    fig.text(.035,.035,"Time = 1 / mean throughput. F1 = mean of LTE and radar detection F1. "
+    fig.text(.035,.035,"Time = 1 / mean throughput. Overlap F1 = frame-level radar/LTE frequency-overlap decision. "
              "Quality matrices use the full 0–1 scale; — = not measured.",fontsize=9,color="#617385")
     return save(fig,output/f"{model}_{scope}{suffix}",formats,dpi)
 
@@ -189,7 +189,7 @@ def overview(rows,models,output,scope="model_compute",batch=1,formats=("png","pd
     fig.subplots_adjust(left=.075,right=.975,top=.90,bottom=.08,hspace=.52,wspace=.24)
     files=save(fig,output/f"overview_{scope}_b{batch:03d}_inference_time_per_frame_s",formats,dpi)
     lookup={(r["model"],r["mode"]):r for r in selected}
-    for field,title in (("macro_f1","Detection F1"),("map50","mAP@0.5")):
+    for field,title in (("overlap_f1","Overlap F1"),("map50","mAP@0.5")):
         fig,ax=plt.subplots(figsize=(16,5.6))
         matrix=[[numeric(lookup.get((m,mode),{}).get(field)) for m in models] for mode in modes]
         im=draw_quality(ax,matrix,[model_label(m) for m in models],modes,"",fontsize=10)
@@ -199,7 +199,7 @@ def overview(rows,models,output,scope="model_compute",batch=1,formats=("png","pd
         fig.text(.035,.89,f"Batch {batch}  ·  rows: deployment policy  ·  columns: model  ·  higher is better",fontsize=11,color="#617385")
         cax=fig.add_axes([.958,.25,.012,.52]);cb=fig.colorbar(im,cax=cax,ticks=[0,.25,.5,.75,1])
         cb.outline.set_visible(False);cb.ax.tick_params(length=0,labelsize=9)
-        note=("F1 averages LTE and radar detection F1 at confidence 0.25 and box IoU 0.5." if field=="macro_f1" else
+        note=("Overlap F1 uses positive-width radar/LTE frequency intersection after confidence 0.25 filtering." if field=="overlap_f1" else
               "mAP@0.5 averages the LTE and radar box AP at IoU 0.5.")
         fig.text(.035,.035,note+"  Exact values are printed in each cell; — = not measured.",fontsize=9,color="#617385")
         fig.subplots_adjust(left=.135,right=.945,top=.79,bottom=.25)

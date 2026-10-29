@@ -1,6 +1,7 @@
-"""Copy known checkpoints and a small PNG demo from a local CBRS-CEDAR-MDI checkout.
+"""Copy known checkpoints and a small PNG demo from a local CBRSRF checkout.
 
-The source needs trained_models/ (released weights) and yolo_split/ (prepared data).
+The source needs trained_models/ (original YOLO), trained_models_cedar_best/
+(latest local CEDAR weights), and yolo_split/ (prepared data).
 --cedar-models-dir selects the CEDAR-YOLO checkpoint set; the reference results in
 results/ used trained_models_mdi.
 """
@@ -19,7 +20,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", type=Path, required=True)
     parser.add_argument("--destination", type=Path, default=Path(__file__).resolve().parents[1])
-    parser.add_argument("--cedar-models-dir", default="trained_models",
+    parser.add_argument("--cedar-models-dir", default="trained_models_cedar_best",
                         help="Folder under --source holding the sig_yolo_* checkpoints")
     args = parser.parse_args()
     records = []

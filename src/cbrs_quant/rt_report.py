@@ -71,7 +71,7 @@ def enrich(meta, raw, baseline="torch_cuda_fp32"):
             raise ValueError(f"{meta['model_id']} {key}: expected {expected} unique timing rounds")
         if len({(r.get("timing_signature"), r.get("quality_signature")) for r in trials}) != 1:
             raise ValueError(f"{meta['model_id']} {key}: mixed timing/quality signatures")
-        for field in ("evaluated_images", "map50", "map50_95", "lte_f1", "radar_f1"):
+        for field in ("evaluated_images", "map50", "map50_95", "lte_f1", "radar_f1", "overlap_f1"):
             if len({r.get(field, "") for r in trials}) != 1:
                 raise ValueError(f"{meta['model_id']} {key}: inconsistent {field} across rounds")
         if any(number(r["images_per_second"]) <= 0 for r in trials):
@@ -83,6 +83,8 @@ def enrich(meta, raw, baseline="torch_cuda_fp32"):
         rate = float(row["images_per_second_mean"])
         row["inference_time_per_frame_s"] = 1.0/rate
         row["lte_f1"], row["radar_f1"] = number(first.get("lte_f1")), number(first.get("radar_f1"))
+        for field in ("TP", "TN", "FP", "FN", "precision", "recall", "f1", "accuracy"):
+            row["overlap_" + field] = number(first.get("overlap_" + field))
         fs = (row["lte_f1"], row["radar_f1"])
         row["macro_f1"] = sum(fs)/2 if all(f is not None for f in fs) else None
         route = meta.get("routes", {}).get(f"{row['batch']}:{row['mode']}", {})
@@ -184,7 +186,7 @@ def observations(rows):
     text = []
     if pairs:
         reductions = [100*(1-b["inference_time_per_frame_s"]/a["inference_time_per_frame_s"]) for a,b in pairs]
-        f1 = [abs(b["macro_f1"]-a["macro_f1"]) for a,b in pairs if a["macro_f1"] is not None and b["macro_f1"] is not None]
+        f1 = [abs(b["overlap_f1"]-a["overlap_f1"]) for a,b in pairs if a["overlap_f1"] is not None and b["overlap_f1"] is not None]
         maps = [abs(float(b["map50"])-float(a["map50"])) for a,b in pairs]
         text.append(f"- **FP16 model computation:** direct TensorRT FP16 reduces time per frame by "
                     f"{min(reductions):.1f}–{max(reductions):.1f}% versus PyTorch FP32 across {len(pairs)} models at batch 1. "
@@ -200,7 +202,7 @@ def observations(rows):
         _, model,a,b=max(quantized, key=lambda x:x[0])
         text.append(f"- **INT8 quality depends on the model:** {model_label(model)} shows the largest batch-1 "
                     f"mAP@0.5 reduction among direct INT8 routes: {float(a['map50']):.4f} → {float(b['map50']):.4f}. "
-                    f"Detection F1 changes from {fmt(a['macro_f1'])} to {fmt(b['macro_f1'])}. "
+                    f"Overlap F1 changes from {fmt(a['overlap_f1'])} to {fmt(b['overlap_f1'])}. "
                     "The detailed reports also show batch-dependent quality changes.")
     png_pairs = []
     for model in models:
@@ -225,10 +227,12 @@ def generate(run, output, formats=("png", "pdf"), dpi=180, baseline="torch_cuda_
     from .results_store import export_data, included, seal
     from .report_text import write_reports
     bundle = load_run(run, baseline)
+    rows = [r for m in bundle["order"] for r in bundle["models"][m]["rows"] if included(r,bundle["report_scope"])]
+    if rows and any(r.get("overlap_f1") is None for r in rows):
+        raise ValueError("Overlap F1 is missing from this run. Historical box F1 cannot be converted to overlap F1. Keep the archived report; analyze a new run with recorded overlap counts.")
     output.mkdir(parents=True, exist_ok=True)
     data = output / "data"
     export_data(bundle, data, dataset_manifest)
-    rows = [r for m in bundle["order"] for r in bundle["models"][m]["rows"] if included(r,bundle["report_scope"])]
     raw = [r for m in bundle["order"] for r in bundle["models"][m]["raw"]]
     routes = route_records(bundle)
     for route in routes:

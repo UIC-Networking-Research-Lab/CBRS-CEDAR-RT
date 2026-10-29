@@ -41,8 +41,11 @@ def install(bundle, destination, project=PROJECT, verify_only=False, *, catalog_
         dst = safe_path(destination, row['destination'])
         if src.stat().st_size != row['bytes'] or digest(src) != row['sha256']:
             raise ValueError(f'Asset checksum mismatch: {src}')
-        if not verify_only and dst.exists() and digest(dst) != row['sha256']:
-            raise FileExistsError(f'Different file already exists: {dst}')
+        if not verify_only and dst.exists():
+            existing = digest(dst)
+            allowed = row.get('replaces_sha256', []) if row['source'].startswith('weights/sig_yolo') else []
+            if existing != row['sha256'] and existing not in allowed:
+                raise FileExistsError(f'Different file already exists: {dst}')
         checked.append((src, dst, row['sha256']))
         if i % 2000 == 0:
             print(f'Verifying {project}: {i}/{len(data["files"])} files', flush=True)
@@ -50,7 +53,7 @@ def install(bundle, destination, project=PROJECT, verify_only=False, *, catalog_
         print(f'Verified {len(checked)} {project} assets; no files installed.')
         return data
     for src, dst, sha in checked:
-        if not dst.exists():
+        if not dst.exists() or digest(dst) != sha:
             dst.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src, dst)
             if digest(dst) != sha:

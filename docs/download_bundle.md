@@ -5,7 +5,7 @@ This download is independent of the MDI paper project's asset package.
 
 ## Download and extract
 
-**[Download CBRS-CEDAR-RT-ASSETS v1.0 from GitHub Releases](https://github.com/UIC-Networking-Research-Lab/CBRS-CEDAR-RT/releases/tag/assets)**
+**[Download CBRS-CEDAR-RT-ASSETS from GitHub Releases](https://github.com/UIC-Networking-Research-Lab/CBRS-CEDAR-RT/releases/tag/assets)**
 
 1. Open the release's **Assets** list and download **all 3 archive parts**:
    `CBRS-CEDAR-RT-ASSETS.7z.001` through `CBRS-CEDAR-RT-ASSETS.7z.003`.
@@ -65,8 +65,8 @@ The test split is also included for further experiments.
 
 `weights/` contains the **12 reference checkpoints**: YOLOv8, YOLO11 and YOLO26
 in nano/small/extra-large sizes, plus three CEDAR-YOLO models with a 20 × 20 grid
-and 100% regression coverage. The CEDAR checkpoints are the earlier Jetson edition
-used in the recorded RT results. Later local/sweep weights belong to the MDI package.
+and 100% regression coverage. The CEDAR checkpoints come from the latest local June model collection.
+The recorded RT results use the earlier edition; the new models have not yet been benchmarked.
 The checkpoint edition does not identify the execution platform: **all RT results
 were measured on the PC GPU**, in Conda `torch270_py312_cuda`; there are no Jetson
 deployment experiments in this report. Tested PC versions are listed in the repository README.
@@ -96,3 +96,7 @@ The checked renderer uses NumPy 2.2.4, SciPy 1.14.1, Matplotlib 3.10.8 and Pillo
 
 The repository contains all scripts, configuration and experiment reports.
 This download contains only datasets, weights, the split list and this README.
+
+## Updated CEDAR checkpoints
+
+Use the updated asset volumes containing the latest local June CEDAR models. Nano and small have changed; extra-large and all original YOLO weights are unchanged. Do not mix volumes from different asset releases. The updated installer upgrades recognized old CEDAR weights. Start a new experiment directory and export new ONNX/TensorRT artifacts. Published results still describe the earlier checkpoints and box-detection F1 until a new sweep is completed.

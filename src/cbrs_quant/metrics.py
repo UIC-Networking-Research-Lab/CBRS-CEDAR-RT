@@ -51,6 +51,28 @@ def average_precision(correct: np.ndarray, scores: np.ndarray, count: int) -> fl
     return float(np.mean(values))
 
 
+def frequency_overlap(boxes: np.ndarray, classes: np.ndarray) -> bool:
+    """MDI rule: any LTE/radar pair with positive-width frequency intersection."""
+    lte, radar = boxes[classes == 0], boxes[classes == 1]
+    if not len(lte) or not len(radar):
+        return False
+    return bool(np.any(np.minimum(lte[:, None, 2], radar[None, :, 2]) >
+                       np.maximum(lte[:, None, 0], radar[None, :, 0])))
+
+
+def overlap_summary(pairs, operating_conf=.25):
+    counts = dict(TP=0, TN=0, FP=0, FN=0)
+    for prediction, target in pairs:
+        selected = prediction[prediction[:, 4] >= operating_conf]
+        predicted = frequency_overlap(selected[:, :4], selected[:, 5])
+        actual = frequency_overlap(target[:, 1:5], target[:, 0])
+        counts['TP' if predicted and actual else 'FP' if predicted else 'FN' if actual else 'TN'] += 1
+    tp, tn, fp, fn = (counts[k] for k in ('TP', 'TN', 'FP', 'FN'))
+    return {**counts, 'precision': tp / max(1, tp + fp),
+            'recall': tp / max(1, tp + fn), 'f1': 2*tp / max(1, 2*tp + fp + fn),
+            'accuracy': (tp + tn) / max(1, tp + tn + fp + fn)}
+
+
 def summarize(pairs: list[tuple[np.ndarray, np.ndarray]], operating_conf: float = 0.25) -> dict:
     if not .001 <= operating_conf <= 1:
         raise ValueError("Operating confidence must be in [.001, 1]")
@@ -103,4 +125,4 @@ def summarize(pairs: list[tuple[np.ndarray, np.ndarray]], operating_conf: float 
             "images": len(pairs), "operating_confidence": operating_conf,
             "map50": float(np.mean([v["ap50"] for v in valid])) if valid else None,
             "map50_95": float(np.mean([v["ap50_95"] for v in valid])) if valid else None,
-            "classes": per_class}
+            "classes": per_class, "overlap": overlap_summary(pairs, operating_conf)}

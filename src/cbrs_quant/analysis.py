@@ -30,7 +30,7 @@ CLASS_METRICS = ("ap50", "ap50_95", "precision", "recall", "f1", "false_positive
                  "matched_frequency_iou")
 PROVENANCE_FIELDS = ("execution_kind", "execution_started_at", "makeup_finished_at", "makeup_id")
 STATUS_FIELDS = ("model", "batch", "mode", "status", "phase", "attempt", *PROVENANCE_FIELDS, "error")
-ACCURACY_FIELDS = ("model", "batch", "mode", *PROVENANCE_FIELDS, "evaluated_images", "map50", "map50_95",
+ACCURACY_FIELDS = ("model", "batch", "mode", *PROVENANCE_FIELDS, "evaluated_images", "map50", "map50_95", "overlap_f1",
                    "map50_delta_pp", "map50_95_delta_pp", "baseline_status",
                    *(f"{name}_{metric}" for name in ("lte", "radar") for metric in CLASS_METRICS))
 TIMING_COLUMNS = ("model", "batch", "mode", *PROVENANCE_FIELDS, "scope", "device", "precision", "rounds",
@@ -333,6 +333,7 @@ def tables(snapshot, baseline):
         quality = {**key, "evaluated_images": metrics["images"], "map50": metrics["map50"],
                    "map50_95": metrics["map50_95"], "baseline_status": "missing",
                    "quality_signature": item["signatures"]["evaluation"]}
+        quality["overlap_f1"] = metrics.get("overlap", {}).get("f1")
         quality.update({f"{name.lower()}_{metric}": metrics["classes"][name][metric]
                         for name in ("LTE", "Radar") for metric in CLASS_METRICS})
         if reference:

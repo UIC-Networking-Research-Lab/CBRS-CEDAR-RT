@@ -1,5 +1,7 @@
 # CBRS-CEDAR-RT: complete GPU experiment report
 
+> **Historical results:** The figures and tables below use the previous CEDAR checkpoint edition and box-detection macro F1. They have not been rerun with the updated weights or Overlap F1. New runs use the June model collection and report frame-level Overlap F1; these measurements must be reported separately.
+
 **288/288 GPU configurations completed: 12 models, batches 1, 4, 8, 8 deployment policies.**
 
 Recorded experiment: `run-20261024-151307-737246`. All final measurements and earlier recorded attempts are stored together in [data/](data/README.md).

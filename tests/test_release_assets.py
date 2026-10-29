@@ -62,3 +62,22 @@ class AssetInstallTests(unittest.TestCase):
             catalog.write_text(json.dumps(data))
             with self.assertRaises(ValueError):
                 install(bundle, root / 'repo', catalog_path=catalog)
+
+class AssetUpgradeTests(unittest.TestCase):
+    def test_known_previous_cedar_can_be_upgraded(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            bundle, catalog = AssetInstallTests().fixture(root)
+            data = json.loads(catalog.read_text())
+            record = next(r for r in data['files'] if r['source'].startswith('weights/'))
+            old_source = bundle / record['source']
+            record['source'] = 'weights/sig_yolo_v8n_f20t20_c100.pt'
+            record['destination'] = 'artifacts/weights/sig_yolo_v8n_f20t20_c100.pt'
+            old_source.rename(bundle / record['source'])
+            dest = root / 'repo' / record['destination']
+            dest.parent.mkdir(parents=True)
+            dest.write_bytes(b'previous checkpoint')
+            record['replaces_sha256'] = [digest(dest)]
+            catalog.write_text(json.dumps(data))
+            install(bundle, root / 'repo', catalog_path=catalog)
+            self.assertEqual(digest(dest), record['sha256'])
