@@ -75,10 +75,10 @@ def print_plan(config):
         print(f"  {phase}: {groups * len(selected)} routes | {', '.join(selected)}", flush=True)
     print(f"  Total: {groups * len(modes)} routes; order: GPU -> CPU.", flush=True)
     if config["smoke"]:
-        print("  Smoke: short timings, up to 8 validation PNGs.", flush=True)
+        print("  Smoke: short timings, up to 8 test PNGs.", flush=True)
     else:
         hours = groups * len(modes) * len(sweep.SCOPES) * 3 * 2 * 30 / 3600
-        print(f"  Formal: 512 calibration PNGs, full validation, 3 scopes, 3 rounds; timing >= {hours:g}h.", flush=True)
+        print(f"  Formal: 512 calibration PNGs, full test, 3 scopes, 3 rounds; timing >= {hours:g}h.", flush=True)
     print(f"  PNGs: {config['data']}\n  Output: {config['output']}", flush=True)
     print("  Each model has results.csv, model.json, comparison.csv, demo/ and ONNX files.", flush=True)
 
@@ -195,7 +195,7 @@ def initialize(args, models):
               "manifest_sha256": digest(args.manifest), "threads": args.threads, "smoke": args.smoke,
               "minimum_free_gib": args.minimum_free_gib, "maximum_worker_gib": args.maximum_worker_gib,
               "protocol": {"seconds": .1 if args.smoke else 30, "rounds": 1 if args.smoke else 3,
-                           "calibration_images": 4 if args.smoke else 512, "evaluation_split": "val",
+                           "calibration_images": 4 if args.smoke else 512, "evaluation_split": "test", "quality_protocol": "cedar-mdi-v1",
                            "scopes": list(sweep.SCOPES)}}
     output.mkdir(parents=True)
     plan = experiment_info(config, output.name, None)
@@ -260,6 +260,9 @@ def compact_makeup(project, list_path, *, dry_run=False, force=False, interval=1
 
 def run_routes(output, config, entries, interval, *, makeup=False, list_sha=None, force=False,
                retry_failed=False):
+    if (config.get("protocol", {}).get("evaluation_split") != "test"
+            or config.get("protocol", {}).get("quality_protocol") != "cedar-mdi-v1"):
+        raise ValueError("Legacy evaluation protocol: start a new test-split run; keep old results unchanged")
     output = output.resolve()
     code_hash = current_signature()
     export_hash = current_signature(EXPORT_FILES)

@@ -10,13 +10,13 @@ from .rt_report import cohorts, enrich
 
 
 def newest_run(root):
-    runs = [p for p in root.iterdir() if p.is_dir() and any(p.glob("*/model.json"))] if root.is_dir() else []
+    runs = [p for p in root.iterdir() if p.is_dir() and
+            (any(p.glob("*/model.json")) or (p / "data/metadata.json").is_file())] if root.is_dir() else []
     if not runs:
-        raise FileNotFoundError(f"No compact experiment under {root}")
-    def created(path):
-        meta = json.loads(read_bytes(next(path.glob("*/model.json")), path.parent))
-        return meta["experiment"]["created_at"], path.name
-    return max(runs, key=created)
+        raise FileNotFoundError(f"No experiment under {root}")
+    # Experiment directory names begin with YYYYMMDD (and optionally HHMMSS).
+    return max(runs, key=lambda path: path.name)
+
 
 
 def load_comparison(path, scratch_parent):

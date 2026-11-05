@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import torch
-from torchvision.ops import batched_nms
+from torchvision.ops import nms
 
 
 def detections(raw: torch.Tensor, layout: str, confidence: float = 0.25,
@@ -18,24 +18,22 @@ def detections(raw: torch.Tensor, layout: str, confidence: float = 0.25,
         if layout == "end2end":
             if prediction.shape[-1] != 6:
                 raise ValueError("End-to-end output must be [B,N,6]")
-            det = prediction[prediction[:, 4] >= confidence]
+            det = prediction[prediction[:, 4] > confidence]
             det = det[det[:, 4].argsort(descending=True)[:max_det]]
         else:
             if prediction.shape[0] != 6 or layout not in ("xyxy_scores", "xywh_scores"):
                 raise ValueError("Dense output must be [B,6,A] for two classes")
             pred = prediction.T
             scores, classes = pred[:, 4:].max(dim=1)
-            selected = scores >= confidence
+            selected = scores > confidence
             boxes, scores, classes = pred[selected, :4], scores[selected], classes[selected]
             if layout == "xywh_scores":
                 center, half = boxes[:, :2], boxes[:, 2:] / 2
                 boxes = torch.cat((center-half, center+half), dim=1)
-            # batched_nms offsets classes assuming nonnegative coordinates.
-            # Translate only for NMS; clipping before it would change box IoU.
-            nms_boxes = boxes - boxes.min().clamp(max=0) if boxes.numel() else boxes
-            keep = batched_nms(nms_boxes, scores, classes, iou)[:max_det]
+            if len(scores) > 30000:
+                order = scores.argsort(descending=True)[:30000]
+                boxes, scores, classes = boxes[order], scores[order], classes[order]
+            keep = nms(boxes + classes[:, None] * 7680.0, scores, iou)[:max_det]
             det = torch.cat((boxes[keep], scores[keep, None], classes[keep, None]), dim=1)
-        det = det.clone()
-        det[:, :4].clamp_(0, 640)
         result.append(det)
     return result

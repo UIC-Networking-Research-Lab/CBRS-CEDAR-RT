@@ -145,7 +145,7 @@ def _run_worker(job_path):
                             attempt, [job_path, graph, sidecar(graph), attempt / "environment.json"]))
             return
         mode = job["mode"]
-        dataset = Dataset(Path(job["data"]), Path(job["manifest"]), "val")
+        dataset = Dataset(Path(job["data"]), Path(job["manifest"]), "test")
         if job["smoke"]:
             dataset.records = dataset.records[:8]
         paths = [dataset.path(r["image"]) for r in dataset.records[:3]]
@@ -172,8 +172,8 @@ def _run_worker(job_path):
             if backend.device.type == "cuda":
                 torch.cuda.empty_cache()
             predict(backend, paths, attempt / "demo")
-            stage_state(attempt, phase="full_validation")
-            quality = evaluate(backend, dataset, progress=worker_progress(attempt, "full_validation"))
+            stage_state(attempt, phase="full_test_evaluation")
+            quality = evaluate(backend, dataset, progress=worker_progress(attempt, "full_test_evaluation"))
             quality.update(smoke_only_subset=job["smoke"], load_seconds=load_seconds,
                            evaluated_images=len(dataset.records))
             write_json(attempt / "evaluation.json", quality)
@@ -429,7 +429,7 @@ def create_config(args):
               "maximum_worker_gib": args.maximum_worker_gib,
               "protocol": {"seconds": .1 if args.smoke else 30, "rounds": 1 if args.smoke else 3,
                            "calibration_images": 4 if args.smoke else 512,
-                           "evaluation_split": "val", "scopes": list(SCOPES)},
+                           "evaluation_split": "test", "quality_protocol": "cedar-mdi-v1", "scopes": list(SCOPES)},
               "source_hashes": {p.relative_to(source).as_posix(): digest(p) for p in source.rglob("*.py")}}
     config["config_sha256"] = fingerprint(config)
     write_json(root / "config.json", config)
@@ -468,10 +468,10 @@ def print_plan(plan):
     print(f"  Total: {groups*len(modes)} routes; order: {order} (all models/batches per phase).", flush=True)
     calibration = str(4 if plan["smoke"] else 512) + " PNGs" if any(m.endswith("int8") for m in modes) else "none (no INT8)"
     if plan["smoke"]:
-        print(f"  Smoke: calibration: {calibration} / up to 8 validation PNGs; short timings.", flush=True)
+        print(f"  Smoke: calibration: {calibration} / up to 8 test PNGs; short timings.", flush=True)
     else:
         hours = groups*len(modes)*len(SCOPES)*3*2*30/3600
-        print(f"  Formal: calibration: {calibration} / full val; 3 scopes, 3 rounds, 50 warmups.", flush=True)
+        print(f"  Formal: calibration: {calibration} / full test; 3 scopes, 3 rounds, 50 warmups.", flush=True)
         print(f"  Each latency/throughput loop: >=30s AND >=1000 images. Timing alone >= {hours:g}h.", flush=True)
     print(f"  PNGs: {plan['data']}\n  Output: {plan['output']}", flush=True)
     print("  Live progress is printed below; full native logs stay in each attempt/worker.log.", flush=True)
@@ -502,6 +502,9 @@ def preflight(plan, weights_manifest=None):
 
 
 def validate_resume(config, output, current_source=None):
+    if (config.get("protocol", {}).get("evaluation_split") != "test"
+            or config.get("protocol", {}).get("quality_protocol") != "cedar-mdi-v1"):
+        raise ValueError("Legacy evaluation protocol: start a new test-split run; keep old results unchanged")
     if Path(config["output"]).resolve() != output.resolve():
         raise ValueError("Run was moved: resume at its original path, or start a new run")
     if fingerprint({k: v for k, v in config.items() if k != "config_sha256"}) != config["config_sha256"]:

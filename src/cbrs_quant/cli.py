@@ -88,7 +88,7 @@ def parser() -> argparse.ArgumentParser:
     p = commands.add_parser("experiment", help="Run selected routes and retain PT/ONNX/engines/results")
     model_args(p)
     data_args(p)
-    p.set_defaults(split="val")
+    p.set_defaults(split="test")
     p.add_argument("--modes", nargs="+", choices=MODES, default=DEFAULT_MODES)
     p.add_argument("--output", type=Path, required=True)
     p.add_argument("--smoke", action="store_true", help="Short timings, 8 eval images and 4 calibration images")

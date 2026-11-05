@@ -115,9 +115,18 @@ class Metrics(unittest.TestCase):
         pred = np.array([[0, 0, 10, 10, .9, 1]])
         truth = np.array([[1, 0, 0, 10, 10]])
         result = summarize([(pred, truth)])
-        self.assertEqual(result["map50_95"], 1)
-        self.assertIsNone(result["classes"]["LTE"]["ap50"])
+        self.assertAlmostEqual(result["map50_95"], .4975)
+        self.assertEqual(result["classes"]["LTE"]["ap50"], 0)
         self.assertEqual(result["classes"]["Radar"]["recall"], 1)
+
+    def test_iou_priority_and_strict_threshold(self):
+        pred = np.array([[0,0,9,10,.9,0], [0,0,10,10,.8,0]])
+        truth = np.array([[0,0,0,10,10]])
+        self.assertEqual(match(pred, truth)[:,0].tolist(), [False, True])
+        pred[:,4] = .25
+        result = summarize([(pred, truth)])
+        self.assertEqual(result['map50'], 0)
+        self.assertEqual(result['classes']['LTE']['false_positives'], 0)
 
     def test_duplicates_and_wrong_class(self):
         pred = np.array([[0, 0, 10, 10, .9, 1], [0, 0, 10, 10, .8, 1],

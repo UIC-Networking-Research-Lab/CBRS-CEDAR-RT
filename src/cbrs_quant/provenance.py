@@ -13,7 +13,7 @@ def precision_notes(storage):
     else:
         origin = "FP32 ONNX is exported from the checkpoint; see floating_tensor_dtypes for its storage."
     return {**storage, "onnx_fp32_origin": origin,
-            "comparison_note": "FP32/FP16 quality is often close; verify validation metrics. "
+            "comparison_note": "FP32/FP16 quality is often close; verify evaluation metrics. "
                                "INT8 quality depends on quantization and calibration."}
 
 

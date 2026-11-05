@@ -21,7 +21,7 @@ from .smoke import smoke
 
 def experiment(model_id: str, weights: Path, data: Path, manifest: Path, output: Path,
                modes: list[str], quick=False, batch=1, samples=512, threads=1,
-               allow_cpu_fallback=False, split="val") -> dict:
+               allow_cpu_fallback=False, split="test") -> dict:
     if len(set(modes)) != len(modes) or not modes or batch < 1 or threads < 1:
         raise ValueError("Modes must be unique; batch and threads must be positive")
     output.mkdir(parents=True, exist_ok=False)

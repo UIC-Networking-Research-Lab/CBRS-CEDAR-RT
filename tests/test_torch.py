@@ -51,6 +51,32 @@ class TorchContracts(unittest.TestCase):
         raw = torch.tensor([[[0, 0, 10, 10, .9, 1], [0, 0, 10, 10, .8, 1]]])
         self.assertEqual(len(detections(raw, "end2end")[0]), 2)
 
+    def test_evaluation_collects_at_mdi_threshold(self):
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        import numpy as np
+        from cbrs_quant.runner import evaluate
+        backend = SimpleNamespace(meta={}, batch=1)
+        data = SimpleNamespace(records=[{'image':'x', 'label':'y', 'split':'test'}],
+                               path=lambda p:p, manifest={'records_sha256':'a','profile_sha256':'b'})
+        with patch('cbrs_quant.runner.load_png', return_value=np.zeros((640,640,3))), \
+             patch('cbrs_quant.runner.load_labels', return_value=np.empty((0,5))), \
+             patch('cbrs_quant.runner.infer', return_value=[np.empty((0,6))]) as infer, \
+             patch('cbrs_quant.runner.environment', return_value={}):
+            report = evaluate(backend, data)
+        self.assertEqual(infer.call_args.args[2], .25)
+        self.assertEqual(report['collection_confidence'], .25)
+        self.assertEqual(report['split'], 'test')
+        self.assertTrue(report['metrics']['protocol'].startswith('cedar-mdi-v1;'))
+
+    def test_mdi_boundary_and_unclipped_boxes(self):
+        raw = torch.tensor([[[650,660],[0,50],[680,690],[10,60],[.9,.1],[.1,.25]]])
+        det = detections(raw, "xyxy_scores")[0]
+        self.assertEqual(len(det), 1)
+        self.assertEqual(float(det[0,0]), 650)
+        raw[0,5,1] = .9
+        self.assertEqual(len(detections(raw, "xyxy_scores")[0]), 2)
+
     def test_xywh_conversion(self):
         raw = torch.tensor([[[5], [5], [10], [10], [.9], [.1]]])
         torch.testing.assert_close(detections(raw, "xywh_scores")[0][0, :4],

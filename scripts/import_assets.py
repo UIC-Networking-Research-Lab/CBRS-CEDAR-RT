@@ -2,8 +2,7 @@
 
 The source needs trained_models/ (original YOLO), trained_models_cedar_best/
 (latest local CEDAR weights), and yolo_split/ (prepared data).
---cedar-models-dir selects the CEDAR-YOLO checkpoint set; the reference results in
-results/ used trained_models_mdi.
+--cedar-models-dir selects the CEDAR-YOLO checkpoint set; the current RT results use the updated local CEDAR checkpoint edition.
 """
 
 import argparse

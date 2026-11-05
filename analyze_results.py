@@ -1,4 +1,4 @@
-"""Rebuild the report from results/data; use --run for a different recorded run."""
+"""Rebuild the latest experiment report in results/; use --run to select another experiment."""
 
 from __future__ import annotations
 
@@ -9,9 +9,9 @@ import sys
 import tempfile
 
 PROJECT_ROOT = Path(__file__).resolve().parent
-RUN_DIR = "results"                    # Canonical combined data; no former outputs needed.
-RUNS_ROOT = "output"
-OUTPUT_ROOT = "analysis_outputs"       # Always separate from experiment outputs.
+RUN_DIR = None                         # Select the latest experiment under results/.
+RUNS_ROOT = "results"
+OUTPUT_ROOT = "results"                # Legacy analysis fallback only.
 BASELINE = "torch_cuda_fp32"
 FORMATS = ["png", "pdf"]
 DPI = 180
@@ -56,7 +56,7 @@ def main(argv=None):
     parser.add_argument("--scope", choices=("all", "model_compute", "detector_pipeline", "image_to_detection"), default=SCOPE)
     parser.add_argument("--overview-scope", choices=("model_compute", "detector_pipeline", "image_to_detection"), default="model_compute")
     parser.add_argument("--publish", help="Write the complete portable report to this directory, e.g. results")
-    parser.add_argument("--update-readme", action="store_true", help="Replace the root README Results section (requires --publish)")
+    parser.add_argument("--update-readme", action="store_true", help="Replace the root README Results section")
     args = parser.parse_args(argv)
     if args.dpi < 72 or not args.formats or len(set(args.formats)) != len(args.formats):
         parser.error("Use DPI >= 72 and unique output formats")
@@ -71,7 +71,7 @@ def main(argv=None):
                 run = newest_run(absolute(args.runs_root))
             except FileNotFoundError:
                 run = PROJECT_ROOT / "results"
-        if (run / "data/metadata.json").is_file() or (run / "metadata.json").is_file():
+        if not any(run.glob("*/model.json")) and ((run / "data/metadata.json").is_file() or (run / "metadata.json").is_file()):
             from cbrs_quant.results_store import data_directory
             from cbrs_quant.rt_report import generate, update_readme
             data = data_directory(run)
@@ -80,7 +80,7 @@ def main(argv=None):
                 raise ValueError("Report output overlaps source data in an unsupported layout")
             print(f"Analysis input: {data}\nReport: {output}", flush=True)
             result = generate(data, output, tuple(args.formats), args.dpi, args.baseline, args.scope, args.overview_scope)
-            if args.update_readme or output == PROJECT_ROOT / "results":
+            if args.update_readme or args.run is None:
                 update_readme(PROJECT_ROOT, output)
             print(f"Done: {result['models']} models, {result['comparisons']} comparison rows, "
                   f"{result['figures']} figures. Full report: {output / 'REPORT.md'}", flush=True)
@@ -104,18 +104,16 @@ def main(argv=None):
             name = first["experiment"].get("name", run.name)
             if Path(name).name != name or name in (".", "..") or "\\" in name:
                 raise ValueError("Invalid experiment name")
-            output = absolute(args.publish) if args.publish else (absolute(args.output_root) / name).resolve()
-            if output.is_relative_to(run.resolve()) or output.is_relative_to(absolute(args.runs_root)):
-                raise ValueError("Analysis figures must be outside the experiment output tree")
-            if run.resolve().is_relative_to(output):
-                raise ValueError("Report output must not contain the source records; choose a new output directory")
+            output = absolute(args.publish) if args.publish else run.resolve()
+            if output != run.resolve() and (output.is_relative_to(run.resolve()) or run.resolve().is_relative_to(output)):
+                raise ValueError("Use the experiment directory itself or a separate destination")
             dataset = run / "dataset.json"
             if not dataset.is_file():
                 dataset = PROJECT_ROOT / "artifacts/dataset.json"
             print(f"Analysis input: {run}\nReport: {output}", flush=True)
             result = generate(run, output, tuple(args.formats), args.dpi, args.baseline, args.scope,
                               args.overview_scope, dataset if dataset.is_file() else None)
-            if args.update_readme:
+            if args.update_readme or args.run is None:
                 update_readme(PROJECT_ROOT, output)
             print(f"Done: {result['models']} models, {result['comparisons']} comparison rows, "
                   f"{result['figures']} figure files.\nFull report: {output / 'REPORT.md'}\n"

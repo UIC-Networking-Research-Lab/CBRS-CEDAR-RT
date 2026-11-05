@@ -1,0 +1,76 @@
+{
+  "schema": 2,
+  "run_name": "test-june-models-20261031-011345",
+  "scope": {
+    "models": [
+      "cbrs_yolo8n",
+      "cbrs_yolo8s",
+      "cbrs_yolo8x",
+      "cbrs_yolo11n",
+      "cbrs_yolo11s",
+      "cbrs_yolo11x",
+      "cbrs_yolo26n",
+      "cbrs_yolo26s",
+      "cbrs_yolo26x",
+      "sig_yolo_v8n_f20t20_c100",
+      "sig_yolo_v8s_f20t20_c100",
+      "sig_yolo_v8x_f20t20_c100"
+    ],
+    "batches": [
+      1,
+      4,
+      8
+    ],
+    "modes": [
+      "torch_cuda_fp32",
+      "torch_cuda_fp16",
+      "ort_cuda_fp32",
+      "ort_cuda_fp16",
+      "ort_trt_fp16",
+      "ort_trt_int8",
+      "trt_fp16",
+      "trt_int8"
+    ]
+  },
+  "files": [
+    {
+      "path": "metadata.json",
+      "sha256": "011bd7c04eda255c419410b0f3f272a47971845a0bf981ed3b50c0f2c9d8b519",
+      "bytes": 45370073
+    },
+    {
+      "path": "rounds.csv",
+      "sha256": "b6faecc1aebd8d846aa976f317193b0178d3d0ea4c346c6e90331dbd3ee6d99b",
+      "bytes": 3886296
+    },
+    {
+      "path": "dataset.json",
+      "sha256": "e27715010ba5488ed72c0333a7bf697c8f84290e1ccf3dfd4e0c8058be3881aa",
+      "bytes": 2204343
+    },
+    {
+      "path": "history.jsonl",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "summary.csv",
+      "sha256": "b4c73e062fd13bd8fcb5e4fee0552c272866de1396ca854c0515f23dc72a9635",
+      "bytes": 450420
+    },
+    {
+      "path": "routes.csv",
+      "sha256": "24fe2a1df974f929bb3cd7e8a722d2cf6560797f70148c616266b0d10ba5d16e",
+      "bytes": 41940
+    }
+  ],
+  "audit": {},
+  "analysis_code_sha256": {
+    "results_store.py": "1f0a03e4c45eb6544f12e4c5c80ddfcfd8b748bed7988c7d47fc33f4d243e7fb",
+    "rt_report.py": "4cbcc0c78079d88b6821fa0381b23f111436aa6bc903c78733fe99c5a67e25f1",
+    "report_text.py": "cda0e02c5562b9f5c79fb9ab5fe1417ec4325bca8c5f0e8398c985d34d0e9f20",
+    "report_plots.py": "c8274130f84f65e6dcc908ce659db73848adfc56c3c66a45788386c1a07fddf4",
+    "compact.py": "c31db5e36283c652a891f7798245f80d9314567108148348e43d89dc26e39a69"
+  },
+  "note": "Original numeric values are retained. Private home prefixes are sanitized. Earlier attempts are provenance, not additional repetitions of final measurements."
+}

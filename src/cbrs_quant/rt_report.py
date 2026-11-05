@@ -96,7 +96,7 @@ def enrich(meta, raw, baseline="torch_cuda_fp32"):
 
 
 def load_run(run, baseline="torch_cuda_fp32"):
-    if (run / "data/metadata.json").is_file() or (run / "metadata.json").is_file():
+    if not any(run.glob("*/model.json")) and ((run / "data/metadata.json").is_file() or (run / "metadata.json").is_file()):
         from .results_store import load_data
         return load_data(run, baseline)
     models, source = {}, []
@@ -115,7 +115,9 @@ def load_run(run, baseline="torch_cuda_fp32"):
     order = [m for m in first["experiment"]["model_order"] if m in models]
     order.extend(m for m in models if m not in order)
     return {"models": models, "order": order, "run_name": first["experiment"].get("name", run.name),
-            "source": source, "baseline": baseline}
+            "source": source, "baseline": baseline,
+            "report_scope": {"models": order, "batches": first["experiment"]["batches"],
+                             "modes": first["experiment"]["modes"]}}
 
 
 def cohorts(rows):

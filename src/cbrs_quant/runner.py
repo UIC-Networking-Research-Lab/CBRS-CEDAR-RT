@@ -76,7 +76,7 @@ def evaluate(backend, dataset: Dataset, confidence=.25, iou=.45, max_det=300, pr
     for start in range(0, len(dataset.records), backend.batch):
         records = dataset.records[start:start+backend.batch]
         images = [load_png(dataset.path(r["image"])) for r in records]
-        predictions = infer(backend, images, .001, iou, max_det)
+        predictions = infer(backend, images, confidence, iou, max_det)
         pairs.extend((pred, load_labels(dataset.path(r["label"])))
                      for pred, r in zip(predictions, records))
         if progress:
@@ -84,7 +84,7 @@ def evaluate(backend, dataset: Dataset, confidence=.25, iou=.45, max_det=300, pr
     return {"kind": "evaluation", "model": backend.meta,
             "dataset_sha256": dataset.manifest["records_sha256"],
             "profile_sha256": dataset.manifest["profile_sha256"],
-            "split": dataset.records[0]["split"], "collection_confidence": .001,
+            "split": dataset.records[0]["split"], "collection_confidence": confidence,
             "nms_iou": iou, "max_det": max_det, "metrics": summarize(pairs, confidence),
             "environment": environment()}
 

@@ -86,7 +86,7 @@ def main(argv=None):
     if args.dry_run:
         print(json.dumps(selected, indent=2))
         return 0
-    folder = PROJECT / "analysis_outputs" / "batch_completion"
+    folder = run / "completion"
     folder.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     status_path = folder / "status.json"
@@ -131,7 +131,7 @@ def main(argv=None):
         remaining = pending(run, args.batches, args.include_cpu)
         save(state="building_report", remaining_routes=remaining)
         report = subprocess.run([sys.executable, "-u", "-B", str(PROJECT/"analyze_results.py"),
-            "--run", str(run), "--publish", "results", "--update-readme"], cwd=PROJECT)
+            "--run", str(run), "--publish", str(run), "--update-readme"], cwd=PROJECT)
         if report.returncode:
             raise RuntimeError(f"Report rebuild exited with {report.returncode}")
         if args.sync_to:
@@ -139,7 +139,10 @@ def main(argv=None):
             if target == PROJECT or not all((target/name).is_file() for name in
                     ("requirements.txt", "run_experiments.py", "src/cbrs_quant/rt_report.py")):
                 raise ValueError("Sync target must be a separate existing CBRS RT repository")
-            shutil.copytree(PROJECT/"results", target/"results", dirs_exist_ok=True)
+            for part in ("data", "figures"):
+                shutil.copytree(run/part, target/"results"/run.name/part, dirs_exist_ok=True)
+            for part in ("REPORT.md", "SUMMARY.md"):
+                shutil.copy2(run/part, target/"results"/run.name/part)
             files = ["analyze_results.py", "src/cbrs_quant/report_plots.py", "src/cbrs_quant/rt_report.py",
                 "src/cbrs_quant/results_store.py", "src/cbrs_quant/report_text.py", "scripts/consolidate_results.py",
                 "src/cbrs_quant/analysis_plots.py", "src/cbrs_quant/compact_analysis.py", "tests/test_report.py", "tests/test_completion.py",
@@ -149,7 +152,7 @@ def main(argv=None):
                     (target/name).parent.mkdir(parents=True, exist_ok=True)
                     shutil.copy2(PROJECT/name,target/name)
             from cbrs_quant.rt_report import update_readme
-            update_readme(target,target/"results")
+            update_readme(target,target/"results"/run.name)
         save(state="complete" if not remaining else "finished_with_missing_routes", finished_at=now())
         print(json.dumps(status,indent=2),flush=True)
         return 0 if not remaining else 1

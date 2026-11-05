@@ -179,11 +179,14 @@ def validate_reports(reports, config, dataset, model, batch, mode):
     quality = reports["evaluation"]
     env = identity(quality, config, dataset, model, batch, mode)
     metrics = quality["metrics"]
+    expected = config.get("protocol", {}).get("quality_protocol")
+    if expected and not metrics["protocol"].startswith(expected + ";"):
+        raise ValueError("Evaluation metric protocol differs from the experiment configuration")
     images = sum(r["split"] == quality["split"] for r in dataset["records"])
     if config["smoke"]:
         images = min(8, images)
     if quality["kind"] != "evaluation" or quality["evaluated_images"] != images or metrics["images"] != images:
-        raise ValueError("Incomplete validation set")
+        raise ValueError("Incomplete evaluation set")
     for metric in ("map50", "map50_95"):
         if metrics[metric] is not None:
             finite(metrics[metric], metric, upper=1)

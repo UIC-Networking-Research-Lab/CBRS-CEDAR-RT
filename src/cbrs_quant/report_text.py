@@ -64,6 +64,11 @@ def overview_sections(rows, overview_files, output, timing_scope):
                     f"**{float(a['map50']):.4f} to {float(b['map50']):.4f}**. "
                     "INT8 deployment therefore requires validation for each model and batch configuration.")
 
+    nano = lookup.get(('sig_yolo_v8n_f20t20_c100', 'torch_cuda_fp32'))
+    nano_int8 = lookup.get(('sig_yolo_v8n_f20t20_c100', 'trt_int8'))
+    if nano and nano_int8:
+        quality.append(f"CEDAR-YOLO-n reaches **{float(nano['overlap_f1']):.4f}** with PyTorch FP32 and **{float(nano_int8['overlap_f1']):.4f}** with direct TensorRT INT8. The INT8 drop is present in the frame-level overlap metric itself, not a comparison against box F1.")
+
     definitions = [
         ('inference_time_per_frame_s', 'Inference speed',
          'Inference time per frame is the inverse of mean throughput across the timing rounds; lower is better. '
@@ -96,23 +101,19 @@ def write_reports(bundle, rows, routes, charts, overview_files, output):
     images = sorted({int(r["evaluated_images"]) for r in rows if r["evaluated_images"] != ""})
     split = ", ".join("validation" if s == "val" else s for s in sorted({r["evaluation_split"] for r in rows}))
     audit = json.loads((output / "data/manifest.json").read_text(encoding="utf-8")).get("audit", {})
-    quality_note = (
-        "Overlap F1 is measured in a quality-only supplementary evaluation of each model/batch/policy "
-        "using the same checkpoints and validation split. Original timing and mAP measurements are retained."
-        if (output / "data/overlap_evaluations.csv").exists() else
-        "Quality is evaluated once for each model/batch/policy.")
+    quality_note = "Quality is evaluated once per model/batch/policy on the test split, using the same checkpoint as its timing experiment. Overlap F1 and mAP are measured together; these are not historical scores or a separate supplementary evaluation."
     parts = ["# CBRS-CEDAR-RT: complete GPU experiment report", "", completion, "",
-        f"Recorded experiment: `{bundle['run_name']}`. All final measurements and earlier recorded attempts are stored together in [data/](data/README.md).", "",
+        f"Current test experiment: `{bundle['run_name']}`. All final measurements and earlier recorded attempts are stored together in [data/](data/README.md).", "",
         "## Setup", "",
         'The four GPU backends are **PyTorch (`Torch`)**, **ONNX Runtime CUDA (`CUDA`)**, **ONNX Runtime TensorRT (`ORT TRT`)**, and **direct TensorRT (`TRT`)**. PyTorch and ONNX Runtime CUDA use FP32/FP16; both TensorRT backends use FP16/INT8. These form eight backend/precision settings. One experimental configuration is one model, batch size, and backend/precision setting. **No CPU measurements are included.**', "",
         "**All experiments in this report run on the PC GPU**, using Python 3.12 and CUDA-compatible PyTorch; no Jetson deployment tests are reported. Checkpoint hashes identify the exact model edition used in each run.", "",
-        "The [README environment table](../README.md#installation) lists tested/recommended versions. Compatible general runtime libraries can be used. For raw-I/Q conversion, preserve preprocessing library versions and parameters: even small pixel changes can invalidate pretrained predictions. The recorded RT experiments use the supplied PNGs directly.", "",
+        "The [README environment table](../../README.md#installation) lists tested/recommended versions. Compatible general runtime libraries can be used. For raw-I/Q conversion, preserve preprocessing library versions and parameters: even small pixel changes can invalidate pretrained predictions. The recorded RT experiments use the supplied PNGs directly.", "",
         f"- Device: **{env.get('gpu','see metadata')}**, {env.get('platform','see metadata')}.",
         f"- Software: Python {env.get('python','see metadata')}; PyTorch {packages.get('torch','see metadata')}; ONNX Runtime {packages.get('onnxruntime-gpu','see metadata')}; TensorRT {packages.get('tensorrt','see metadata')}.",
         f"- Evaluation: **{split} split, {', '.join(map(str,images))} images**. INT8 calibration uses 512 training images.",
         "- Models: YOLOv8, YOLO11 and YOLO26 at nano, small and extra-large sizes; CEDAR-YOLO-n/s/x with a 20 × 20 feature grid. Checkpoint identities are recorded in the experiment metadata.",
         f"- Timing: {first['experiment'].get('protocol',{}).get('rounds',3)} rounds per scope, with separate synchronized latency and throughput loops. Each loop uses the recorded minimum duration and image count; inputs and runtime caches are warmed.",
-        f"- Scope: {devices} policies at batches {', '.join(map(str,scope['batches']))}. Original plan entries outside this evaluation remain in the data with `in_scope=False`.", "",
+        f"- Scope: {devices} policies at batches {', '.join(map(str,scope['batches']))}. All eight GPU policies are evaluated for every model and batch.", "",
         "| Timing scope | Included work |", "|---|---|",
         "| Model computation | Forward pass, with the input tensor already on the device |",
         "| Detector pipeline | Preprocessing, forward pass and box decoding/NMS from a decoded image |",
@@ -120,10 +121,17 @@ def write_reports(bundle, rows, routes, charts, overview_files, output):
         "## Metrics", "", "| Metric | Meaning |", "|---|---|",
         "| Inference time per frame (s/frame) ↓ | Inverse of mean throughput across the three rounds. At batch > 1, this is time normalized by throughput, not request latency. |",
         "| Overlap F1 ↑ | Frame-level radar/LTE frequency-overlap F1, using the MDI rule: any positive-width frequency intersection. Detections use confidence 0.25; overlap is the positive class. |",
-        "| mAP@0.5 ↑ | Mean LTE/radar box AP at IoU 0.5; confidence-greedy matching and 101 recall points. |",
+        "| mAP@0.5 ↑ | Mean LTE/radar box AP at IoU 0.5, using CEDAR-MDI matching and interpolated trapezoidal AP. |",
         "| mAP@0.5:0.95 ↑ | Mean AP over IoU thresholds 0.50 to 0.95; retained in all detailed tables. |",
         "| p50 / p95 / p99 | Per-batch request latency percentiles in milliseconds, averaged across rounds. |", "",
         quality_note + " Repeated quality columns across timing scopes refer to that same evaluation.", "",
+        "### Quality protocol used in this experiment", "",
+        "**Overlap F1 is a frame-level decision metric.** Predictions with confidence strictly greater than 0.25 are retained. A frame is positive if at least one LTE box and one radar box have a positive-width intersection along the horizontal frequency axis. The same rule is applied to ground-truth boxes. Touching edges do not count; time-axis intersection is not required. Counts are pooled over the test frames, and `F1 = 2 TP / (2 TP + FP + FN)`. This is not the mean of LTE and radar box F1 scores.", "",
+        "**mAP measures box detection.** The evaluator uses the same confidence-filtered predictions, matches same-class predictions to labels greedily by descending IoU, and permits one match per prediction and label. For each class, predictions are sorted by confidence; AP integrates the precision envelope on 101 recall points with the trapezoidal rule. mAP@0.5 averages the two class APs at IoU 0.5; mAP@0.5:0.95 additionally averages ten IoU thresholds. This is the CEDAR-MDI evaluation protocol used by the code, rather than an unqualified COCO benchmark score.", "",
+        "Dense YOLO outputs use class-aware NMS at IoU 0.45 and a maximum of 300 detections. YOLO26 retains its native end-to-end output and is confidence-filtered without an additional NMS pass. All backends use the same postprocessing rule for a given model.", "",
+        "### Checkpoints and comparison scope", "",
+        "CEDAR-YOLO nano and small use the updated local June checkpoints. The extra-large checkpoint is byte-identical to the earlier edition; the nine original YOLO checkpoints are unchanged. This report uses the new test sweep throughout. Old validation results and old class-averaged F1 are not mixed into its plots or conclusions.", "",
+        "The experiments ran on the author's personal RTX 2070 PC. These measurements describe that setup; reproduce the comparison on a controlled target system before selecting a deployment configuration.", "",
         "## Results", "",
         "The three figures below compare inference speed, overlap F1 and mAP@0.5 at batch 1. "
         "The detailed tables cover all evaluated batch sizes and timing scopes.", ""]
@@ -136,7 +144,7 @@ def write_reports(bundle, rows, routes, charts, overview_files, output):
         n = sum(r["status"] == "passed" for r in group)
         parts.append(f"| {batch} | {n}/{len(group)} | {len(group)-n} |")
     parts.extend(["", f"The final tables contain **{len(rows)} model × batch × policy × timing-scope aggregates**. Each aggregate is checked against its original rounds and protocol signatures.", "",
-        f"Earlier attempts are retained in `data/history.jsonl` ({audit.get('history_attempts','see manifest')} distinct archived attempts). They are excluded from the final averages. The original full experiment plan and canceled entries remain traceable in `data/routes.csv` and `data/metadata.json`.", "",
+        f"Earlier attempts are retained in `data/history.jsonl` ({audit.get('history_attempts','see manifest')} distinct archived attempts). They are excluded from the final averages. Final configuration states and checkpoint identities are recorded in `data/routes.csv` and `data/metadata.json`.", "",
         "## All model results", "", "| Model | Final configurations | Detailed results |", "|---|---:|---|"])
     for model in scope["models"]:
         group = [r for r in selected_routes if r["model"] == model]
@@ -160,9 +168,9 @@ def write_reports(bundle, rows, routes, charts, overview_files, output):
             parts.append("")
     parts.extend(["## Rebuild or analyze", "",
         "```bash\npython -m pip install -r requirements.txt\npython analyze_results.py\n```", "",
-        "The command reads `results/data/`, verifies checksums and regenerates this report, all figures and the root README. It needs no GPU, images, weights or former output directories.", "",
-        "For your own analysis, read `results/data/summary.csv` directly, or use:", "",
-        '```python\nimport sys\nsys.path.insert(0, "src")\nfrom cbrs_quant.results_store import table\nsummary = table("results", "summary")\nrounds = table("results", "rounds")\n```', "",
+        "The command selects the newest experiment under `results/`, verifies its stored data and regenerates the report, figures and root README. Use `--run results/<experiment-name>` to select a run explicitly. Published report regeneration needs no GPU, images or weights.", "",
+        "Read this experiment's `data/summary.csv` for full-precision values, or use:", "",
+        f'```python\nimport sys\nsys.path.insert(0, "src")\nfrom cbrs_quant.results_store import table\nsummary = table("results/{output.name}", "summary")\nrounds = table("results/{output.name}", "rounds")\n```', "",
         "See [data/README.md](data/README.md) for file schemas, scope filtering and provenance.", ""])
     (output / "REPORT.md").write_text("\n".join(parts),encoding="utf-8")
     summary = ["## Results", "", completion, "",
@@ -177,32 +185,33 @@ def write_reports(bundle, rows, routes, charts, overview_files, output):
         "model computation, the detector pipeline, and PNG-to-detection execution so application costs can be assessed alongside kernel speed.", "",
         "[Complete report](REPORT.md) · [Combined measurements](data/summary.csv) · [Data guide](data/README.md)", ""]
     (output / "SUMMARY.md").write_text("\n".join(summary),encoding="utf-8")
-    guide = """# Consolidated experiment data
+    guide = f"""# Current test experiment data
 
-This is the single data location used by `python analyze_results.py`. Files are combined across all models, batches and policies; no per-model result directories are needed.
+All records in this directory belong to the current test sweep: 12 models, batches 1/4/8 and eight GPU policies (288 configurations). The fixed test split contains 848 PNGs. No CPU or historical validation results are included in the reported aggregates.
 
 | File | Contents |
 |---|---|
-| `summary.csv` | Final full-precision aggregates: model, batch, policy and timing scope; time per frame, throughput, F1, mAP and latency percentiles. |
-| `rounds.csv` | Every original row from the latest compact results, including unrun plan placeholders. Filter `status == passed` and a nonempty `scope` for measurements. |
-| `routes.csv` | Original full-plan states plus `in_scope`; use `in_scope == True` for the final GPU evaluation. |
-| `overlap_evaluations.csv` | Quality-only re-evaluation: overlap confusion counts, weights/data identity, evaluation time and diagnostic mAP. Original timing and mAP are retained. |
-| `metadata.json` | All model metadata, experiment protocols, environments, hashes, calibration records and the explicit final report scope. |
-| `dataset.json` | Dataset membership, split labels and hashes; no input images. |
-| `history.jsonl` | Earlier recorded attempts, including failures and available partial measurements; these are not extra repetitions of the final evaluation. |
-| `manifest.json` | SHA-256 checksums, source audit and analysis-code hashes. |
+| `summary.csv` | 864 final model/batch/policy/scope aggregates, including time per frame, overlap F1, mAP and per-batch latency percentiles. |
+| `rounds.csv` | Original timing rows and the quality measurements attached to them. |
+| `routes.csv` | Configuration completion states and report membership. |
+| `metadata.json` | Checkpoint hashes, runtime versions, evaluation protocol, export and calibration metadata. |
+| `dataset.json` | Fixed split membership and SHA-256 hashes of PNGs and labels. |
+| `history.jsonl` | Earlier attempts, excluded from final averages. |
+| `manifest.json` | File checksums and analysis provenance. |
 
-`inference_time_per_frame_s = 1 / mean(images_per_second)` across the three timing rounds. `overlap_f1` is the frame-level radar/LTE frequency-overlap F1, computed from pooled confusion counts using the same definition as MDI. Historical `macro_f1`, `lte_f1` and `radar_f1` fields remain in the data for traceability and are not plotted. Quality is evaluated once per configuration and repeated alongside each timing scope.
+`inference_time_per_frame_s = 1 / mean(images_per_second)` across three rounds; this is reciprocal throughput, not mean request latency. `overlap_f1` uses pooled frame-level TP/FP/FN and the CEDAR-MDI frequency-overlap rule. `macro_f1`, `lte_f1` and `radar_f1` are diagnostic box metrics and are not the F1 shown in figures. mAP uses same-class IoU matching and interpolated trapezoidal AP after confidence filtering at 0.25.
 
-The final scope is 12 models, batches 1/4/8 and eight GPU policies. CPU testing is canceled. The original plan also included batches 16/32; those unrun entries remain provenance and are excluded from report completion counts.
+Quality is evaluated once per configuration. Its repetition across three timing scopes and rounds does not represent independent quality trials. Filter one scope when comparing quality across configurations.
 
-Numeric measurements are preserved. Private home-directory prefixes are sanitized. Historical runtime and export paths in metadata describe the original runs; analysis reads only files in this directory. Input data and model weights are external assets.
+From the repository root:
 
 ```python
 import csv
 from pathlib import Path
-with Path("results/data/summary.csv").open(newline="", encoding="utf-8") as f:
-    rows = list(csv.DictReader(f))
+with Path("results/{output.name}/data/summary.csv").open(newline="", encoding="utf-8") as stream:
+    rows = list(csv.DictReader(stream))
 ```
+
+Historical absolute paths in metadata identify the recorded run; report generation uses the files in this directory. Download images and checkpoints from the separate assets package to rerun inference.
 """
-    (output / "data/README.md").write_text(guide,encoding="utf-8")
+    (output / "data/README.md").write_text(guide, encoding="utf-8")

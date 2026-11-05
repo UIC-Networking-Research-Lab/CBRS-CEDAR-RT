@@ -122,9 +122,14 @@ class CompactTests(unittest.TestCase):
         self.assertEqual(row["baseline_status"], "protocol_mismatch")
         self.assertNotIn("speedup_vs_torch_fp32", row)
 
+    def test_legacy_protocol_cannot_resume(self):
+        with self.assertRaisesRegex(ValueError, "Legacy evaluation protocol"):
+            run_routes(self.output, self.fixture.config, [], 10)
+
     def test_interrupted_export_does_not_start_fallback(self):
         f = self.fixture
-        config = dict(f.config, output=str(self.output), minimum_free_gib=0)
+        config = dict(f.config, output=str(self.output), minimum_free_gib=0,
+                      protocol={**f.config["protocol"], "evaluation_split": "test", "quality_protocol": "cedar-mdi-v1"})
         model = initialize_model(self.output, "cbrs_yolo8n", config, f.dataset, "weight-hash")
         meta = read_json(model / "model.json")
         meta["checkpoint_path"] = str(f.root / "checkpoint.pt")
@@ -155,7 +160,8 @@ class CompactTests(unittest.TestCase):
     def test_compact_runner_stores_fake_worker_results_without_attempt_folders(self):
         self.setup_success()
         f = self.fixture
-        config = dict(f.config, output=str(self.output), minimum_free_gib=0)
+        config = dict(f.config, output=str(self.output), minimum_free_gib=0,
+                      protocol={**f.config["protocol"], "evaluation_split": "test", "quality_protocol": "cedar-mdi-v1"})
         self.output.mkdir()
         model = initialize_model(self.output, "cbrs_yolo8n", config, f.dataset, "weight-hash")
         checkpoint = model / "best.pt"

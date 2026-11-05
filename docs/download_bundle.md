@@ -59,14 +59,14 @@ python reproduce.py --task full
 
 `datasets/` contains all prepared **640 × 640 PNGs and YOLO labels**: 3,946 training,
 846 validation and 848 test samples. Class 0 is LTE; class 1 is radar.
-**The recorded RT experiments evaluate the validation split**, with calibration
+**The current RT experiments evaluate the fixed test split**, with calibration
 images drawn from the training split. `splits.csv` preserves the exact membership.
-The test split is also included for further experiments.
+Validation images are retained for model development; they are not the reported evaluation set.
 
 `weights/` contains the **12 reference checkpoints**: YOLOv8, YOLO11 and YOLO26
 in nano/small/extra-large sizes, plus three CEDAR-YOLO models with a 20 × 20 grid
 and 100% regression coverage. The CEDAR checkpoints come from the latest local June model collection.
-The recorded RT results use the earlier edition; the new models have not yet been benchmarked.
+The current published RT results use the updated local CEDAR edition on the test split.
 The checkpoint edition does not identify the execution platform: **all RT results
 were measured on the PC GPU**, with the software versions listed in the repository README; there are no Jetson
 deployment experiments in this report. Tested PC versions are listed in the repository README.
@@ -83,7 +83,7 @@ If you download raw recordings to regenerate PNGs, use the assets' `splits.csv`
 the exact split membership. Follow the
 [MDI raw-data preparation guide](https://github.com/UIC-Networking-Research-Lab/CBRS-CEDAR-MDI/blob/main/docs/data.md#5-build-the-raw-sigmf-split),
 and preserve that membership through conversion. Use training images for calibration
-and validation images for reproducing the RT evaluation. The PNGs in this download
+and test images for the reported RT evaluations. The PNGs in this download
 already follow these splits.
 
 **Preprocessing parameters and library versions change the spectrogram pixels.
@@ -99,4 +99,4 @@ This download contains only datasets, weights, the split list and this README.
 
 ## Updated CEDAR checkpoints
 
-Use the updated asset volumes containing the latest local June CEDAR models. Nano and small have changed; extra-large and all original YOLO weights are unchanged. Do not mix volumes from different asset releases. The updated installer upgrades recognized old CEDAR weights. Start a new experiment directory and export new ONNX/TensorRT artifacts. Published results still describe the earlier checkpoints and box-detection F1 until a new sweep is completed.
+Use the updated asset volumes containing the latest local June CEDAR models. Nano and small have changed; extra-large and all original YOLO weights are unchanged. Do not mix volumes from different asset releases. The updated installer upgrades recognized old CEDAR weights. Start a new experiment directory and export new ONNX/TensorRT artifacts. Published results now use these checkpoints and MDI-aligned frame-level overlap F1; mAP remains a box-detection metric.

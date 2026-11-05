@@ -41,41 +41,43 @@ graphs; FP16 TensorRT engines are built from FP32 ONNX. ONNX Runtime TensorRT
 and direct TensorRT are separate deployment paths, as shown by `ORT TRT` and
 `TRT` in the figures.
 
-## Results
+> **Current evaluation:** All results below come from the updated-checkpoint sweep on the fixed test split, using CEDAR-MDI-aligned frame-level Overlap F1 and box mAP. Historical validation results have been replaced.
 
-> **Historical results:** The figures and tables below use the previous CEDAR checkpoint edition and box-detection macro F1. They have not been rerun with the updated weights or Overlap F1. New runs use the June model collection and report frame-level Overlap F1; these measurements must be reported separately.
+## Results
 
 **288/288 GPU configurations completed: 12 models, batches 1, 4, 8, 8 deployment policies.**
 
-The experiments evaluate 12 pretrained detectors on an **NVIDIA GeForce RTX 2070** PC. The figures show **batch 1, model computation**; quality is evaluated on the same **846 validation images**. INT8 calibration uses 512 training images. Each policy uses the same source checkpoint for its model.
+The experiments evaluate 12 pretrained detectors on an **NVIDIA GeForce RTX 2070** PC. The figures show **batch 1, model computation**; quality is evaluated on the same **848 test images**. INT8 calibration uses 512 training images. Each policy uses the same source checkpoint for its model.
+
+Quality is evaluated once per model/batch/policy on the test split, using the same checkpoint as its timing experiment. Overlap F1 and mAP are measured together; these are not historical scores or a separate supplementary evaluation.
 
 ### Inference speed
 
-![Inference speed across deployment policies](results/figures/overview_model_compute_b001_inference_time_per_frame_s.png)
+![Inference speed across deployment policies](results/20261031-new-test-gpu-b1-4-8/figures/overview_model_compute_b001_inference_time_per_frame_s.png)
 
 Inference time per frame is the inverse of mean throughput across the timing rounds; lower is better. Each panel uses its own time scale. Figure labels: Torch = PyTorch; CUDA = ONNX Runtime CUDA; ORT TRT = ONNX Runtime TensorRT; TRT = direct TensorRT.
 
-ONNX Runtime with TensorRT FP16 achieves **2.94–6.94× the PyTorch FP32 throughput** across 12 models in this timing scope. Direct TensorRT FP16 achieves **3.22–7.94× the PyTorch FP32 throughput** across 12 models in this timing scope. For YOLOv8x, ORT CUDA FP16 takes 0.1191 s/frame, compared with 0.0412 s/frame for PyTorch FP32.
+ONNX Runtime with TensorRT FP16 achieves **2.96–6.83× the PyTorch FP32 throughput** across 12 models in this timing scope. Direct TensorRT FP16 achieves **3.25–7.71× the PyTorch FP32 throughput** across 12 models in this timing scope. For YOLOv8x, ORT CUDA FP16 takes 0.1191 s/frame, compared with 0.0413 s/frame for PyTorch FP32.
 
-### Detection F1
+### Overlap F1
 
-![Detection F1 across deployment policies](results/figures/overview_model_compute_b001_macro_f1.png)
+![Overlap F1 across deployment policies](results/20261031-new-test-gpu-b1-4-8/figures/overview_model_compute_b001_overlap_f1.png)
 
-Rows are deployment policies and columns are models. Values average LTE and radar box-detection F1 at confidence 0.25 and box IoU 0.5; higher is better.
+Rows are deployment policies and columns are models. Overlap F1 measures the frame-level radar/LTE frequency-overlap decision at confidence 0.25, using the same rule as MDI; higher is better.
 
-The TensorRT FP16 configurations track each model's PyTorch FP32 quality: the largest absolute detection-F1 change is **0.00085**. INT8 has a larger, model-dependent effect. For YOLO26x, direct TensorRT INT8 changes F1 from **0.9774 to 0.6581**.
+The TensorRT FP16 configurations track each model's PyTorch FP32 quality: the largest absolute overlap-F1 change is **0.00090**. The largest absolute Overlap-F1 change with direct TensorRT INT8 is **0.74508** on YOLO26x: **0.9910 to 0.2459**. CEDAR-YOLO-n reaches **0.9991** with PyTorch FP32 and **0.9126** with direct TensorRT INT8. The INT8 drop is present in the frame-level overlap metric itself, not a comparison against box F1.
 
 ### mAP@0.5
 
-![mAP@0.5 across deployment policies](results/figures/overview_model_compute_b001_map50.png)
+![mAP@0.5 across deployment policies](results/20261031-new-test-gpu-b1-4-8/figures/overview_model_compute_b001_map50.png)
 
 The matrix reports mean average precision for LTE and radar boxes at IoU 0.5; higher is better.
 
-Across the TensorRT FP16 configurations, the largest absolute mAP@0.5 change from PyTorch FP32 is **0.00008**. The largest mAP@0.5 reduction under direct TensorRT INT8 occurs on YOLO26x: **0.9936 → 0.7624**. INT8 deployment therefore requires validation for each model and batch configuration.
+Across the TensorRT FP16 configurations, the largest absolute mAP@0.5 change from PyTorch FP32 is **0.00019**. The largest mAP@0.5 reduction under direct TensorRT INT8 occurs on YOLO26x: **0.9902 to 0.6898**. INT8 deployment therefore requires validation for each model and batch configuration.
 
 **Deployment assessment.** TensorRT FP16 provides the most consistent combination of faster model execution and preserved detection quality in this testbed. INT8 can further reduce computation time for selected models, with quality checked for the selected configuration. The full report separates model computation, the detector pipeline, and PNG-to-detection execution so application costs can be assessed alongside kernel speed.
 
-[Complete report](results/REPORT.md) · [Combined measurements](results/data/summary.csv) · [Data guide](results/data/README.md)
+[Complete report](results/20261031-new-test-gpu-b1-4-8/REPORT.md) · [Combined measurements](results/20261031-new-test-gpu-b1-4-8/data/summary.csv) · [Data guide](results/20261031-new-test-gpu-b1-4-8/data/README.md)
 
 ## Timing scopes
 
@@ -189,7 +191,7 @@ Follow the parent repository's
 [raw-data split restoration steps](https://github.com/UIC-Networking-Research-Lab/CBRS-CEDAR-MDI/blob/main/docs/data.md#5-build-the-raw-sigmf-split).
 Keep the same membership when converting recordings to PNGs. The supplied RT
 PNGs are already split: calibration uses training images, and the reported RT
-quality measurements use validation images. Do not create a new random split
+quality measurements use the fixed test split. Do not create a new random split
 when reproducing these results.
 
 **Both library versions and preprocessing parameters affect the spectrogram pixels.**
@@ -206,7 +208,7 @@ The parent project's [preprocessing guide](https://github.com/UIC-Networking-Res
 documents the full contract and a pixel-comparison check. The RT experiments use
 supplied PNGs; they do not include raw-I/Q conversion. A custom conversion workflow
 must pass pixel checks first. New evaluations report frame-level **Overlap F1**,
-using the same frequency-overlap decision as MDI, on the RT validation split.
+using the same frequency-overlap decision as MDI, on the fixed test split.
 
 ## Run the experiments
 
@@ -214,8 +216,13 @@ New evaluations use **Overlap F1** for the frame-level CBRS decision
 and **mAP@0.5** for box localization quality. A frame is overlap-positive when
 any predicted LTE/radar pair has a positive-width intersection along frequency;
 the time-axis intersection is not required. Detections are filtered at confidence
-0.25, and F1 is computed from confusion counts pooled over all validation frames.
-This is the same decision rule as MDI, on the RT validation split.
+strictly greater than 0.25, and F1 is computed from confusion counts pooled over all test frames.
+Both quality metrics use the same retained predictions, with confidence > 0.25,
+class-aware NMS at IoU 0.45 and at most 300 detections; CEDAR boxes are not clipped.
+mAP follows CEDAR-MDI: greedy matching by descending IoU, a precision envelope,
+101-point interpolation with trapezoidal integration, and a mean over both classes
+(including zero for an absent class). INT8 calibration still uses training images.
+New evaluation records identify this protocol as `cedar-mdi-v1`.
 
 ```bash
 python run_experiments.py --dry-run                                  # show the plan only
@@ -231,15 +238,15 @@ The published experiments do not include CPU measurements. With 3 scopes ×
 3 rounds × 2 timing loops of at least 30 s each, timing alone takes at least 43.2 hours. INT8 calibration
 uses 512 training PNGs.
 
-`--resume --output output/<run>` continues an interrupted run, and `--retry-failed` retries
+`--resume --output results/<experiment_name>` continues an interrupted run, and `--retry-failed` retries
 failed configurations. A host-memory guard (`--maximum-worker-gib`, default 8) stops configurations that
 would exhaust RAM, and such failures are recorded in `results.csv`.
 
-New experiment output layout (the included reference data is consolidated in `results/data/`):
+New experiment output layout (the included reference data is consolidated in `results/20261031-new-test-gpu-b1-4-8/data/`):
 
 ```
-output/<run>/<model>/
-  results.csv            every configuration, timing round and validation metric
+results/<experiment_name>/<model>/
+  results.csv            every configuration, timing round and evaluation metric
   comparison.csv         mean speed / latency, quality and speed-up per configuration
   model.json             experiment, environment and artifact provenance
   best.pt                copy of the source checkpoint
@@ -260,8 +267,8 @@ python run_experiments.py --makeup            # --force-makeup repeats configura
 ### Complete batches 1, 4 and 8
 
 ```bash
-python scripts/complete_batch_sweep.py --run output/<run> --batches 1 4 8 --dry-run
-python scripts/complete_batch_sweep.py --run output/<run> --batches 1 4 8
+python scripts/complete_batch_sweep.py --run results/<experiment_name> --batches 1 4 8 --dry-run
+python scripts/complete_batch_sweep.py --run results/<experiment_name> --batches 1 4 8
 ```
 
 This selects failed, missing and pending configurations, keeps completed configurations, and uses the
@@ -269,11 +276,11 @@ original measurement protocol. Completion selects GPU policies by default. After
 `results/` and the README comparison. On Windows, system sleep is prevented for the
 process lifetime. Optional `--sync-to <RT-repository>` copies the finished report and
 analysis code to another prepared RT repository. Status and logs belong under
-`analysis_outputs/batch_completion/`. Rerun the command to retry any remaining configurations.
+`results/<experiment_name>/completion/`. Rerun the command to retry any remaining configurations.
 
 ## Analyze
 
-All recorded data is combined in `results/data/`. Rebuild the report and figures in place:
+The latest published measurements are combined in `results/20261031-new-test-gpu-b1-4-8/data/`. The default command selects the newest experiment and rebuilds its report and figures in place:
 
 ```bash
 python -m pip install -r requirements.txt
@@ -283,25 +290,25 @@ python analyze_results.py
 The command verifies checksums, recomputes the full-precision tables, regenerates the figures
 and updates the root README. It requires no GPU, images, weights or former `output/` directories.
 
-For direct analysis, use `results/data/summary.csv` (final aggregates), `rounds.csv` (original
+For direct analysis, use `results/20261031-new-test-gpu-b1-4-8/data/summary.csv` (final aggregates), `rounds.csv` (original
 rows) and `routes.csv` (scope and configuration states). All model metadata, the dataset manifest and
-historical attempts are in the same directory. See the [data guide](results/data/README.md).
+historical attempts are in the same directory. See the [data guide](results/20261031-new-test-gpu-b1-4-8/data/README.md).
 
 ```python
 import sys
 sys.path.insert(0, "src")
 from cbrs_quant.results_store import table
-rows = table("results", "summary")
+rows = table("results/20261031-new-test-gpu-b1-4-8", "summary")
 ```
 
 To analyze a new compact experiment without replacing the included paper-independent reference dataset:
 
 ```bash
-python analyze_results.py --run output/<run> --publish results_new
+python analyze_results.py --run results/<experiment_name> --publish results_new
 ```
 
 Time charts use vertical bars; F1 and mAP use annotated matrices. PNG and PDF figures are
-saved under `results/figures/`. The [complete report](results/REPORT.md) contains all models,
+saved under `results/20261031-new-test-gpu-b1-4-8/figures/`. The [complete report](results/20261031-new-test-gpu-b1-4-8/REPORT.md) contains all models,
 batches and timing scopes in one document. `--overview-scope image_to_detection` includes
 PNG decoding and preprocessing in the README timing comparison.
 
@@ -326,7 +333,7 @@ Copy the selected `.onnx`, its `.onnx.json` and `src/cbrs_quant/` to the target 
 
 ```bash
 python cli.py predict --model cbrs_yolo8n --batch 1 \
-    --mode ort_trt_int8 --onnx output/<run>/cbrs_yolo8n/batch_001_int8.onnx \
+    --mode ort_trt_int8 --onnx results/<experiment_name>/cbrs_yolo8n/batch_001_int8.onnx \
     --input /path/to/spectrogram.png --output /path/to/predictions
 ```
 
@@ -366,7 +373,3 @@ results/                reference results of the run above
 
 [GNU AGPL-3.0](LICENSE). This project uses [Ultralytics](https://github.com/ultralytics/ultralytics)
 (AGPL-3.0). ONNX Runtime, TensorRT and the dataset keep their own licenses.
-
-### Overlap F1 in new runs
-
-A frame is positive when any LTE/radar box pair intersects with positive width along the frequency axis, irrespective of time overlap. Predicted boxes use confidence 0.25. F1 is computed from pooled frame-level TP/FP/FN counts. Box mAP remains a separate localization metric. Old box-detection F1 cannot be relabeled as Overlap F1. The report generator rejects runs without this metric, preserving the archived figures. No experiments were rerun for this model/code update.

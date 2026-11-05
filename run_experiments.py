@@ -23,7 +23,7 @@ DRY_RUN = False                       # True: show the plan without running anyt
 DATA_DIR = "data/yolo_split"           # Prepared PNGs and labels inside this project.
 DATASET_MANIFEST = "artifacts/dataset.json"
 WEIGHTS_MANIFEST = "artifacts/weights/manifest.json"
-OUTPUT_DIR = None                      # None: new timestamped directory under output/.
+OUTPUT_DIR = None                      # None: new timestamped directory under results/.
 RESUME = False                        # Requires OUTPUT_DIR pointing to an existing run.
 RETRY_FAILED = False
 MAKEUP_MODE = False                    # True: run only entries from MAKEUP_LIST in the original run.
@@ -83,7 +83,9 @@ def sweep_arguments(args):
         modes = [m for route in routes for m in ROUTE_MODES[route]]
         if args.pytorch and any(route != "D" for route in routes):
             modes = ["torch_cuda_fp32", "torch_cuda_fp16", *modes]
-    output = args.output or f"output/run-{datetime.now():%Y%m%d-%H%M%S-%f}"
+    device = "gpu" if all("cpu" not in m for m in modes) else "cpu" if all("cpu" in m for m in modes) else "mixed"
+    batches = "-".join(map(str, args.batches))
+    output = args.output or f"results/{datetime.now():%Y%m%d-%H%M%S}-test-{device}-b{batches}"
     argv = ["--project-root", str(PROJECT_ROOT), "--output", str(absolute(output)),
             "--data", str(absolute(args.data)), "--manifest", str(absolute(args.manifest)),
             "--weights-manifest", str(absolute(args.weights_manifest)),
@@ -123,7 +125,16 @@ def main(argv=None):
         makeup_only = {"--makeup-list", "--force-makeup", "--no-force-makeup"}
         if any(item.split("=", 1)[0] in makeup_only for item in explicit):
             raise ValueError("Makeup options require --makeup; no regular sweep was started")
-        return run_sweep(sweep_arguments(args))
+        sweep_args = sweep_arguments(args)
+        result = run_sweep(sweep_args)
+        if result == 0 and not args.dry_run:
+            import subprocess
+            run = Path(sweep_args[sweep_args.index("--output") + 1])
+            report = run
+            print(f"Experiments complete. Generating report: {report}", flush=True)
+            return subprocess.call([sys.executable, "-B", str(PROJECT_ROOT / "analyze_results.py"),
+                                    "--run", str(run), "--publish", str(report), "--update-readme"])
+        return result
     except KeyboardInterrupt:
         message = ("Stopped. Finished makeup results are retained; run --makeup again to continue."
                    if args.makeup else "Stopped. Finished artifacts are retained; use --resume --output <run>.")

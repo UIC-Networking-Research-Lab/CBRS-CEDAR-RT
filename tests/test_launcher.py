@@ -187,6 +187,7 @@ class LauncherTests(unittest.TestCase):
                                    progress_interval=10)
             config = create_config(args)
             self.assertEqual(config["model_order"], args.models)
+            self.assertEqual(config["protocol"]["evaluation_split"], "test")
 
     def test_resume_rejects_mixed_supervisor_and_worker_sources(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -197,6 +198,7 @@ class LauncherTests(unittest.TestCase):
             for folder in (snapshot, active):
                 (folder/"module.py").write_text("value = 1\n")
             config = dict(output=str(root), source=str(snapshot),
+                          protocol={"evaluation_split": "test", "quality_protocol": "cedar-mdi-v1"},
                           source_hashes={"module.py": digest(snapshot/"module.py")})
             config["config_sha256"] = fingerprint(config)
             validate_resume(config, root, active)
